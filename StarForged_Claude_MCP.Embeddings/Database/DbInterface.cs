@@ -1,21 +1,12 @@
-﻿using StarForged_Claude_MCP.Embeddings.Database.Models;
-using Dapper;
+﻿using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Embeddings.Services.Models;
 
 namespace StarForged_Claude_MCP.Embeddings.Database;
 
-public interface IDbInterface
-{
-    Task<int> WriteEmbedding(string text, float[] vector, string sourceDocument, int tokenCount);
-    Task<TextResult?> GetText(int id);
-    Task<List<TextResult>> GetTextByIds(int[] ids);
-    Task DeleteEmbedding(int id);
-    Task<List<VectorResult>> GetAllVectors();
-    Task TestConnection();
-}
-
-public class DbInterface : IDbInterface
+public class DbInterface
 {
     private readonly string _connectionString;
 
@@ -25,12 +16,12 @@ public class DbInterface : IDbInterface
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
     }
 
-    public async Task<int> WriteEmbedding(string text, float[] vector, string sourceDocument, int tokenCount)
+    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, string sourceDocument)
     {
         using var connection = new SqlConnection(_connectionString);
         var id = await connection.QuerySingleAsync<int>(
-            "INSERT INTO Embeddings (Text, Vector, SourceDocument, TokenCount) OUTPUT INSERTED.Id VALUES (@Text, @Vector, @SourceDocument, @TokenCount)",
-            new { Text = text, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = tokenCount });
+            "insert into Embeddings (Text, Vector, SourceDocument, TokenCount) output inserted.Id values (@Text, @Vector, @SourceDocument, @TokenCount)",
+            new { Text = chunk.DisplayText, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length });
         return id;
     }
 
@@ -38,7 +29,7 @@ public class DbInterface : IDbInterface
     {
         using var connection = new SqlConnection(_connectionString);
         var result = await connection.QuerySingleOrDefaultAsync<dynamic>(
-            "SELECT Id, Text, SourceDocument FROM Embeddings WHERE Id = @Id",
+            "select Id, Text, SourceDocument from Embeddings where Id = @Id",
             new { Id = id });
 
         if (result == null) return null;
@@ -57,9 +48,23 @@ public class DbInterface : IDbInterface
 
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "SELECT Id, Text, SourceDocument FROM Embeddings WHERE Id IN @Ids",
+            "select Id, Text, SourceDocument from Embeddings where Id in @Ids",
             new { Ids = ids });
 
+        return results.Select(r => new TextResult
+        {
+            Id = r.Id,
+            Text = r.Text,
+            SourceDocument = r.SourceDocument
+        }).ToList();
+    }
+
+    public async Task<List<TextResult>> GetTextBySourceDocument(string sourceDocument)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<dynamic>(
+            "select Id, Text, SourceDocument from Embeddings where SourceDocument = @SourceDocument",
+            new { SourceDocument = sourceDocument });
         return results.Select(r => new TextResult
         {
             Id = r.Id,
@@ -72,15 +77,15 @@ public class DbInterface : IDbInterface
     {
         using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync(
-            "DELETE FROM Embeddings WHERE Id = @Id",
+            "delete from Embeddings where Id = @Id",
             new { Id = id });
     }
 
-    public async Task<List<VectorResult>> GetAllVectors()
+    internal async Task<List<VectorResult>> GetAllVectors()
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "SELECT Id, Vector FROM Embeddings");
+            "select Id, Vector from Embeddings");
 
         return results.Select(r => new VectorResult
         {
@@ -92,7 +97,7 @@ public class DbInterface : IDbInterface
     public async Task TestConnection()
     {
         using var connection = new SqlConnection(_connectionString);
-        await connection.QueryAsync<dynamic>("SELECT TOP 0 Id, Text, Vector, SourceDocument, TokenCount FROM Embeddings");
+        await connection.QueryAsync<dynamic>("select top 0 Id, Text, Vector, SourceDocument, TokenCount from Embeddings");
     }
 
     private static byte[] FloatsToBytes(float[] floats)

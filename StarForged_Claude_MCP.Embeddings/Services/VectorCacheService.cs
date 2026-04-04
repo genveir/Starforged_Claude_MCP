@@ -1,9 +1,10 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using StarForged_Claude_MCP.Embeddings.Database;
 
 namespace StarForged_Claude_MCP.Embeddings.Services;
 
-public class VectorCacheService : IHostedService
+internal class VectorCacheService : IHostedService
 {
     private readonly IServiceScopeFactory _scopeFactory;
     private Dictionary<int, float[]> _vectorCache = new();
@@ -27,7 +28,7 @@ public class VectorCacheService : IHostedService
     public async Task RefreshCache()
     {
         using var scope = _scopeFactory.CreateScope();
-        var dbInterface = scope.ServiceProvider.GetRequiredService<Database.IDbInterface>();
+        var dbInterface = scope.ServiceProvider.GetRequiredService<DbInterface>();
 
         var vectors = await dbInterface.GetAllVectors();
 
@@ -62,7 +63,7 @@ public class VectorCacheService : IHostedService
         {
             foreach (var kvp in _vectorCache)
             {
-                if (VectorsEqual(kvp.Value, vector))
+                if (VectorsAreEqual(kvp.Value, vector))
                 {
                     return kvp.Key;
                 }
@@ -75,15 +76,5 @@ public class VectorCacheService : IHostedService
         }
     }
 
-    private static bool VectorsEqual(float[] a, float[] b)
-    {
-        if (a.Length != b.Length) return false;
-
-        for (int i = 0; i < a.Length; i++)
-        {
-            if (a[i] != b[i]) return false;
-        }
-
-        return true;
-    }
+    private static bool VectorsAreEqual(float[] a, float[] b) => a.SequenceEqual(b);
 }

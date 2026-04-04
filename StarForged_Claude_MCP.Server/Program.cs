@@ -1,10 +1,9 @@
-﻿using BERTTokenizers;
-using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Services;
-using StarForged_Claude_MCP.Server.Services;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using StarForged_Claude_MCP.Embeddings;
+using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Server.Services;
 
 namespace StarForged_Claude_MCP.Server;
 
@@ -16,12 +15,8 @@ public class Program
 
         builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 
-        builder.Services.AddSingleton<IDbInterface, DbInterface>();
-        builder.Services.AddSingleton<VectorCacheService>();
-        builder.Services.AddHostedService(sp => sp.GetRequiredService<VectorCacheService>());
-        builder.Services.AddSingleton<BertUncasedLargeTokenizer>();
-        builder.Services.AddSingleton<EmbeddingsService>();
-        builder.Services.AddSingleton<MarkdownChunker>();
+        builder.Services.AddEmbeddingsServices();
+
         builder.Services.AddSingleton<EmbeddingsFacade>();
         builder.Services.AddSingleton<McpServer>();
 
@@ -53,14 +48,14 @@ public class Program
     private static async Task ValidateStartupAsync(IServiceProvider services)
     {
         // Validate ONNX model exists
-        var modelPath = Path.Combine(AppContext.BaseDirectory, "ExternalDependencies", "model.onnx");
+        var modelPath = Path.Combine(AppContext.BaseDirectory, "model.onnx");
         if (!File.Exists(modelPath))
         {
             throw new FileNotFoundException($"ONNX model not found at: {modelPath}");
         }
 
         // Validate database connectivity
-        var db = services.GetRequiredService<IDbInterface>();
+        var db = services.GetRequiredService<DbInterface>();
         await db.TestConnection();
 
         // Cache is validated automatically by VectorCacheService.StartAsync during host.Build()

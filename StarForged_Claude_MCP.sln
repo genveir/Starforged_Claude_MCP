@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.Serve
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.DirectUpload", "StarForged_Claude_MCP.DirectUpload\StarForged_Claude_MCP.DirectUpload.csproj", "{C845689F-CD9A-4E50-BA71-6770318FCAD3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.Tests", "StarForged_Claude_MCP.Tests\StarForged_Claude_MCP.Tests.csproj", "{2CD091B6-3976-4C53-86E0-21B474BBA24D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -55,6 +57,18 @@ Global
 		{C845689F-CD9A-4E50-BA71-6770318FCAD3}.Release|x64.Build.0 = Release|Any CPU
 		{C845689F-CD9A-4E50-BA71-6770318FCAD3}.Release|x86.ActiveCfg = Release|Any CPU
 		{C845689F-CD9A-4E50-BA71-6770318FCAD3}.Release|x86.Build.0 = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|x64.Build.0 = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Debug|x86.Build.0 = Debug|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|x64.ActiveCfg = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|x64.Build.0 = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|x86.ActiveCfg = Release|Any CPU
+		{2CD091B6-3976-4C53-86E0-21B474BBA24D}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

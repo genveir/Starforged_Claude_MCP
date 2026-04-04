@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "StarForged_Claude_MCP.DirectUpload": {
+      "commandName": "Project",
+      "commandLineArgs": "E:\\repos\\Starforged\\CompressedBackground"
+    }
+  }
+}
