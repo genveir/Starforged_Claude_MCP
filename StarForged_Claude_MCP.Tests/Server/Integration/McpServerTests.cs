@@ -1,6 +1,7 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
 using System.Text.Json;
@@ -266,6 +267,9 @@ public class McpServerTests : IClassFixture<TestFixture>
     {
         var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
         await dbInterface.DeleteAllEmbeddings();
+
+        var vectorCache = _fixture.Services.GetRequiredService<VectorCacheService>();
+        await vectorCache.RefreshCache();
     }
 
     private async Task AddTestMemory(string text, string sourceDocument)
