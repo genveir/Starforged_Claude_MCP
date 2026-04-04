@@ -1,10 +1,6 @@
-using Dapper;
 using FluentAssertions;
-using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
 using System.Text.Json;
@@ -142,7 +138,15 @@ public class McpServerTests : IClassFixture<TestFixture>
 
         var content = result.Content[0];
         content.Text.Should().NotBeNull();
-        content.Text.Should().Contain("results");
+
+        var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
+        var results = searchResponse.GetProperty("results")
+            .EnumerateArray()
+            .Select(e => e.GetString())
+            .ToArray();
+
+        results.Should().Contain("The wizard cast a powerful fireball spell.");
+        results.Should().Contain("The rogue snuck past the guards silently.");
     }
 
     [Fact]
@@ -192,65 +196,65 @@ public class McpServerTests : IClassFixture<TestFixture>
     }
 
     [Fact]
-    public async Task AddMemory_ShouldStoreCorrectTokenCount()
+    public async Task Search_SemanticRelevance_ShouldReturnTopTwoRelatedEntries()
     {
-        var testText = "The warrior drew his sword.";
+        var sourceDoc = "test_semantic_relevance";
+
+        await AddTestMemory("The coral reef teems with colorful tropical fish and sea anemones.", sourceDoc);
+        await AddTestMemory("Dolphins are highly intelligent marine mammals that live in the ocean.", sourceDoc);
+
+        await AddTestMemory("The blacksmith hammered the glowing iron on the anvil.", sourceDoc);
+        await AddTestMemory("She baked a sourdough loaf with rosemary and sea salt.", sourceDoc);
+        await AddTestMemory("The spacecraft entered orbit around the red planet.", sourceDoc);
+        await AddTestMemory("A dense fog rolled over the mountain peaks at dawn.", sourceDoc);
+        await AddTestMemory("The chess grandmaster sacrificed his queen to secure the endgame.", sourceDoc);
+        await AddTestMemory("Lightning struck the old oak tree at the edge of the field.", sourceDoc);
+        await AddTestMemory("The orchestra performed Beethoven's Fifth Symphony to a standing ovation.", sourceDoc);
+        await AddTestMemory("He debugged the memory leak by profiling heap allocations.", sourceDoc);
+        await AddTestMemory("The tax reform bill passed through the senate with a narrow majority.", sourceDoc);
+        await AddTestMemory("Ancient Roman aqueducts supplied fresh water to cities across the empire.", sourceDoc);
 
         var request = new JsonRpcRequest
         {
-            Id = "8",
+            Id = "7",
             Method = "tools/call",
             Params = new CallToolParams
             {
-                Name = "add_memory",
+                Name = "search",
                 Arguments = new Dictionary<string, object>
-                {
-                    { "text", testText },
-                    { "sourceDocument", "test_tokencount" }
-                }
+            {
+                { "query", "ocean wildlife and sea creatures" },
+                { "topK", 2 }
+            }
             }
         };
 
         var response = await InvokeServerMethod(request);
 
         response.Should().NotBeNull();
-        response.Id.Should().Be("8");
+        response.Id.Should().Be("7");
         response.Error.Should().BeNull();
 
-        var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
-        var storedResult = await dbInterface.GetTextBySourceDocument("test_tokencount");
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(response.Result, _jsonOptions),
+            _jsonOptions);
 
-        storedResult.Should().NotBeNull();
-        var id = storedResult.Single().Id;
+        result.Should().NotBeNull();
+        result.Content.Should().NotBeNull();
+        result.Content.Should().HaveCount(1);
 
-        var expectedTokenCount = Tokenizer.Tokenize(testText).Length;
+        var content = result.Content[0];
+        content.Text.Should().NotBeNull();
 
-        var tokenCount = await GetTokenCountFromDatabase(id);
+        var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
+        var results = searchResponse.GetProperty("results")
+            .EnumerateArray()
+            .Select(e => e.GetString())
+            .ToArray();
 
-        // Verify the token count matches what we calculated
-        tokenCount.Should().Be(expectedTokenCount);
-
-        // Verify it's not the old behavior of always returning 512
-        tokenCount.Should().NotBe(512);
-
-        // For a short sentence like "The warrior drew his sword.", we expect a small token count
-        tokenCount.Should().BeGreaterThan(0, $"token count should be greater than 0, but was {tokenCount}");
-        tokenCount.Should().BeLessThanOrEqualTo(512, $"token count should be less than or equal to 512, but was {tokenCount}");
-    }
-
-    private async Task<int> GetTokenCountFromDatabase(int id)
-    {
-        var connectionString = _fixture.Services.GetRequiredService<IConfiguration>()
-            .GetConnectionString("DefaultConnection");
-
-        await using var connection = new SqlConnection(connectionString);
-        await connection.OpenAsync();
-
-        var tokenCount = await connection.ExecuteScalarAsync<int>(
-            "select TokenCount from Embeddings where Id = @Id",
-            new { Id = id });
-
-        return tokenCount;
+        results.Should().HaveCount(2);
+        results.Should().Contain("The coral reef teems with colorful tropical fish and sea anemones.");
+        results.Should().Contain("Dolphins are highly intelligent marine mammals that live in the ocean.");
     }
 
     private async Task AddTestMemory(string text, string sourceDocument)

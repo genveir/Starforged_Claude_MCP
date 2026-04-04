@@ -22,20 +22,17 @@ public class FileUploader
 
         foreach (var filePath in files)
         {
-            try
-            {
-                Console.WriteLine($"Processing: {filePath}");
 
-                var text = await File.ReadAllTextAsync(filePath);
-                var result = await UploadFileAsync(text, filePath);
+            Console.WriteLine($"Processing: {filePath}");
 
-                Console.WriteLine($"  Uploaded {result.ChunkCount} chunk(s) with IDs: {string.Join(", ", result.Ids)}");
-                totalChunks += result.ChunkCount;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"  Error processing file: {ex.Message}");
-            }
+            var text = await File.ReadAllTextAsync(filePath);
+
+            var fileName = Path.GetFileName(filePath);
+
+            var result = await UploadFileAsync(text, fileName);
+
+            Console.WriteLine($"  Uploaded {result.ChunkCount} chunk(s) with IDs: {string.Join(", ", result.Ids)}");
+            totalChunks += result.ChunkCount;
         }
 
         Console.WriteLine($"\nCompleted! Total chunks uploaded: {totalChunks}");

@@ -21,7 +21,7 @@
 		<None Include="..\ONNX_Model\model.onnx" Link="model.onnx">
 			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
 		</None>
-	</ItemGroup>
+		</ItemGroup>
 
 	<ItemGroup>
 		<InternalsVisibleTo Include="StarForged_Claude_MCP.Tests" />

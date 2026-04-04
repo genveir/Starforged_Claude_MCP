@@ -29,6 +29,7 @@ public class Program
 
         builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 
+        builder.Services.AddSingleton<FileUploader>();
         builder.Services.AddEmbeddingsServices();
 
         var host = builder.Build();

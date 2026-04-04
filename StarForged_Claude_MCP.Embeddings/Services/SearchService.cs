@@ -1,4 +1,5 @@
-﻿using StarForged_Claude_MCP.Embeddings.Database;
+﻿using Microsoft.Extensions.Logging;
+using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
@@ -15,20 +16,25 @@ namespace StarForged_Claude_MCP.Embeddings.Services
         private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
         private readonly EmbeddingsService embeddingsService;
         private readonly DbInterface dbInterface;
+        private readonly ILogger<SearchService> logger;
 
         public SearchService(VectorCacheService vectorCache,
             UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
             EmbeddingsService embeddingsService,
-            DbInterface dbInterface)
+            DbInterface dbInterface,
+            ILogger<SearchService> logger)
         {
             this.vectorCache = vectorCache;
             this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
             this.embeddingsService = embeddingsService;
             this.dbInterface = dbInterface;
+            this.logger = logger;
         }
 
         public async Task<string[]> Search(string input, int topK)
         {
+            logger.LogInformation("Starting search with input: {Input} and topK: {TopK}", input, topK);
+
             var inputChunk = unchunkableFlatTextPreprocessor.Process(input).Chunks.Single();
 
             var ids = await PerformSimilaritySearch(inputChunk, topK);
@@ -47,7 +53,11 @@ namespace StarForged_Claude_MCP.Embeddings.Services
         {
             var queryVector = embeddingsService.GenerateEmbeddings(input);
 
+            logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
+
             var vectors = await vectorCache.GetAllVectors();
+
+            logger.LogDebug("Vector count on similarity search: {VectorCount}", vectors.Count);
 
             var similarities = vectors
                 .Select(kvp => new { Id = kvp.Key, Similarity = CosineSimilarity(queryVector, kvp.Value) })
@@ -55,6 +65,8 @@ namespace StarForged_Claude_MCP.Embeddings.Services
                 .Take(topK)
                 .Select(x => x.Id)
                 .ToArray();
+
+            logger.LogInformation("Similarity search completed. Top {TopK} IDs: {Ids}", topK, similarities);
 
             return similarities;
         }

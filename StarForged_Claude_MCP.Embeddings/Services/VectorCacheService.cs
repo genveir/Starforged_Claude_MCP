@@ -56,6 +56,19 @@ internal class VectorCacheService : IHostedService
         }
     }
 
+    public async Task AddVector(int id, float[] vector)
+    {
+        await _cacheLock.WaitAsync();
+        try
+        {
+            _vectorCache[id] = vector;
+        }
+        finally
+        {
+            _cacheLock.Release();
+        }
+    }
+
     public async Task<int?> FindExistingVector(float[] vector)
     {
         await _cacheLock.WaitAsync();

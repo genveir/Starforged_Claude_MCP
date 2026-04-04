@@ -59,6 +59,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
                 }
 
                 var storedChunkId = await dbInterface.WriteEmbedding(chunk, embedding, sourceDocument);
+                await vectorCache.AddVector(storedChunkId, embedding);
                 storedChunkIds.Add(storedChunkId);
             }
 

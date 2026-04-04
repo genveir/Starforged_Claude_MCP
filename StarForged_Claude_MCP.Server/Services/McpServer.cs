@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
@@ -6,11 +7,13 @@ namespace StarForged_Claude_MCP.Server.Services;
 public class McpServer
 {
     private readonly EmbeddingsFacade _embeddings;
+    private readonly ILogger<McpServer> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public McpServer(EmbeddingsFacade backend)
+    public McpServer(EmbeddingsFacade backend, ILogger<McpServer> logger)
     {
         _embeddings = backend;
+        _logger = logger;
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -32,6 +35,10 @@ public class McpServer
                 var request = JsonSerializer.Deserialize<JsonRpcRequest>(line, _jsonOptions);
                 if (request == null) continue;
 
+                // Notifications have no id and must not receive a response
+                if (request.Id == null) continue;
+
+                _logger.LogDebug("Received request: {Method} (id={Id})", request.Method, request.Id);
                 var response = await HandleRequestAsync(request);
                 var responseJson = JsonSerializer.Serialize(response, _jsonOptions);
                 await Console.Out.WriteLineAsync(responseJson);
@@ -39,9 +46,10 @@ public class McpServer
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Unhandled exception processing request");
                 var errorResponse = new JsonRpcResponse
                 {
-                    Id = null,
+                    Id = 0,
                     Error = new JsonRpcError
                     {
                         Code = -32603,
@@ -145,6 +153,8 @@ public class McpServer
 
             var resultText = await ExecuteToolAsync(callParams.Name, callParams.Arguments);
 
+            _logger.LogInformation("Tool '{ToolName}' executed successfully", callParams.Name);
+
             return new JsonRpcResponse
             {
                 Id = request.Id,
@@ -159,6 +169,7 @@ public class McpServer
         }
         catch (ArgumentException ex)
         {
+            _logger.LogWarning("Tool call argument error: {Message}", ex.Message);
             return new JsonRpcResponse
             {
                 Id = request.Id,
@@ -171,6 +182,7 @@ public class McpServer
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "Tool execution failed");
             return new JsonRpcResponse
             {
                 Id = request.Id,

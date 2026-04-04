@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 
 namespace StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
@@ -5,6 +6,12 @@ namespace StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 public class MarkdownPreprocessor : IDocumentPreprocessor
 {
     private const int MaxTokens = 512;
+    private readonly ILogger<MarkdownPreprocessor> logger;
+
+    public MarkdownPreprocessor(ILogger<MarkdownPreprocessor> logger)
+    {
+        this.logger = logger;
+    }
 
     public PreprocessedText Process(string text)
     {
@@ -19,7 +26,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return new PreprocessedText(Chunks: [.. chunks]);
     }
 
-    private static List<ProcessorChunk> PreprocessMarkdown(string text)
+    private List<ProcessorChunk> PreprocessMarkdown(string text)
     {
         var lines = text.Split(['\n', '\r']);
 
@@ -41,15 +48,20 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
             }
         }
 
-        return StripEmptyChunks(wellSizedChunks);
+        var chunks = StripEmptyChunks(wellSizedChunks);
+
+        foreach (var chunk in chunks)
+            chunk.FinalizeTokens();
+
+        return chunks;
     }
 
-    private static List<ProcessorChunk> StripEmptyChunks(List<ProcessorChunk> processorChunks)
+    private List<ProcessorChunk> StripEmptyChunks(List<ProcessorChunk> processorChunks)
     {
-        return [.. processorChunks.Where(pc => pc.Tokens.Length > 0)];
+        return [.. processorChunks.Where(pc => pc.Text.Length > 0)];
     }
 
-    private static List<ProcessorChunk> ChunkByHighLevelHeaders(string[] lines)
+    private List<ProcessorChunk> ChunkByHighLevelHeaders(string[] lines)
     {
         // single pass, split on # and ##, put header names in breadcrumb.
         List<ProcessorChunk> processorChunks = [];
@@ -96,7 +108,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return processorChunks;
     }
 
-    private static List<ProcessorChunk> RechunkHighLevelChunk(ProcessorChunk processorChunk)
+    private List<ProcessorChunk> RechunkHighLevelChunk(ProcessorChunk processorChunk)
     {
         var splitByLowLevelHeaders = ChunkByLowLevelHeaders(processorChunk);
 
@@ -119,12 +131,12 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return wellSizedChunks;
     }
 
-    private static List<ProcessorChunk> ChunkByLowLevelHeaders(ProcessorChunk processorChunk)
+    private List<ProcessorChunk> ChunkByLowLevelHeaders(ProcessorChunk processorChunk)
     {
         return SplitByHeader(processorChunk, "### ");
     }
 
-    private static ProcessorChunk CreateProcessorChunkWithOptionalBreadcrumb(ProcessorChunk parent, List<string> chunkLines, string currentHeader)
+    private ProcessorChunk CreateProcessorChunkWithOptionalBreadcrumb(ProcessorChunk parent, List<string> chunkLines, string currentHeader)
     {
         var tentative = CreateProcessorChunk(chunkLines, parent.BreadcrumbParts);
 
@@ -142,7 +154,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         }
     }
 
-    private static List<ProcessorChunk> RechunkLowLevelChunk(ProcessorChunk processorChunk)
+    private List<ProcessorChunk> RechunkLowLevelChunk(ProcessorChunk processorChunk)
     {
         var splitByBoldHeader = ChunkByBoldHeader(processorChunk);
 
@@ -165,12 +177,12 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return wellSizedChunks;
     }
 
-    private static List<ProcessorChunk> ChunkByBoldHeader(ProcessorChunk processorChunk)
+    private List<ProcessorChunk> ChunkByBoldHeader(ProcessorChunk processorChunk)
     {
         return SplitByHeader(processorChunk, "**");
     }
 
-    private static List<ProcessorChunk> SplitByHeader(ProcessorChunk processorChunk, string headerMarker)
+    private List<ProcessorChunk> SplitByHeader(ProcessorChunk processorChunk, string headerMarker)
     {
         List<ProcessorChunk> processorChunks = [];
 
@@ -201,9 +213,9 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return processorChunks;
     }
 
-    private static List<ProcessorChunk> ChunkGreedyByLineBreaks(ProcessorChunk processorChunk)
+    private List<ProcessorChunk> ChunkGreedyByLineBreaks(ProcessorChunk processorChunk)
     {
-        // split greedily by line breaks. If a paragraph is longer than 512 tokens truncate the tokens to 512.
+        // split greedily by line breaks. If a paragraph is longer than 512 tokens log and continue
         var lines = processorChunk.Lines;
 
         List<string> chunkLines = [];
@@ -221,7 +233,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
             {
                 if (current == null)
                 {
-                    tentative.TruncateTokensTo(MaxTokens);
+                    logger.LogWarning("Unable to add paragraph {EntireParagraph}", line);
                     processorChunks.Add(tentative);
                     chunkLines.Clear();
                 }
@@ -247,14 +259,14 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return processorChunks;
     }
 
-    private static ProcessorChunk CreateProcessorChunk(List<string> chunkLines, string?[] breadcrumbParts)
+    private ProcessorChunk CreateProcessorChunk(List<string> chunkLines, string?[] breadcrumbParts)
     {
         return new ProcessorChunk(
             lines: [.. chunkLines],
             breadcrumbParts: breadcrumbParts);
     }
 
-    private static List<ProcessorChunk> TrimLines(List<ProcessorChunk> processorChunks)
+    private List<ProcessorChunk> TrimLines(List<ProcessorChunk> processorChunks)
     {
         // trim whitespace, trim horizontal markers at top and bottom
         for (int i = 0; i < processorChunks.Count; i++)
@@ -265,7 +277,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         return processorChunks;
     }
 
-    private static ProcessorChunk TrimLines(ProcessorChunk processorChunk)
+    private ProcessorChunk TrimLines(ProcessorChunk processorChunk)
     {
         int trimFromStart = 0;
         for (int i = 0; i < processorChunk.Lines.Length; i++)
@@ -304,7 +316,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
                 .Take(processorChunk.Lines.Length - trimFromStart - trimFromEnd)],
             breadcrumbParts: processorChunk.BreadcrumbParts);
 
-        static bool IsTrimLine(string line)
+        bool IsTrimLine(string line)
         {
             if (string.IsNullOrWhiteSpace(line))
                 return true;
@@ -334,15 +346,15 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         {
             get
             {
-                _tokens ??= Tokenizer.Tokenize(Breadcrumb + '\n' + Text);
+                _tokens ??= Tokenizer.GetTokensForCount(Breadcrumb + '\n' + Text);
 
                 return _tokens;
             }
         }
 
-        public void TruncateTokensTo(int maxValue)
+        public void FinalizeTokens()
         {
-            _tokens = [.. Tokens.Take(maxValue)];
+            _tokens = Tokenizer.Tokenize(Breadcrumb + '\n' + Text);
         }
     }
 }

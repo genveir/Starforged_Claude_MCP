@@ -1,20 +1,31 @@
-﻿using BERTTokenizers;
+﻿using BERTTokenizers.Base;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 
 namespace StarForged_Claude_MCP.Embeddings.Services.Preprocessing
 {
     internal static class Tokenizer
     {
-        private static readonly BertUncasedLargeTokenizer tokenizer = new();
+        private sealed class TokenizerWithPath(string path) : UncasedTokenizer(path);
 
-        public static Token[] Tokenize(string text)
+        private static readonly UncasedTokenizer tokenizer = new TokenizerWithPath(
+            Path.Combine(AppContext.BaseDirectory, "Vocabularies", "base_uncased_large.txt"));
+
+        public static Token[] Tokenize(string text) => GetTokens(text, 512);
+
+        public static Token[] GetTokensForCount(string text)
+        {
+            var tokens = GetTokens(text, 8000);
+
+            return tokens.Where(t => t.AttentionMask != 0).ToArray();
+        }
+
+        private static Token[] GetTokens(string text, int length)
         {
             text = text.Replace('\n', ' ').Replace('\r', ' ');
 
-            var tokens = tokenizer.Encode(8000, text);
+            var tokens = tokenizer.Encode(length, text);
 
             return [.. tokens
-                .Where(x => x.AttentionMask != 0)
                 .Select(x => new Token(x.InputIds, x.AttentionMask, x.TokenTypeIds))];
         }
     }
