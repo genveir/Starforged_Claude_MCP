@@ -50,10 +50,29 @@ internal sealed class EmbeddingsService : IDisposable
         using var firstResult = results.First();
         var outputTensor = firstResult.AsTensor<float>();
 
-        var embedding = new float[outputTensor.Dimensions[1]];
-        for (int i = 0; i < embedding.Length; i++)
+        // last_hidden_state shape: [1, seq_len, hidden_size]
+        int seqLen = outputTensor.Dimensions[1];
+        int hiddenSize = outputTensor.Dimensions[2];
+
+        // Mean pool over non-padding tokens using the attention mask
+        var embedding = new float[hiddenSize];
+        int count = 0;
+
+        for (int t = 0; t < seqLen; t++)
         {
-            embedding[i] = outputTensor[0, i];
+            if (attentionMask[0, t] == 1)
+            {
+                for (int h = 0; h < hiddenSize; h++)
+                {
+                    embedding[h] += outputTensor[0, t, h];
+                }
+                count++;
+            }
+        }
+
+        for (int h = 0; h < hiddenSize; h++)
+        {
+            embedding[h] /= count;
         }
 
         return embedding;

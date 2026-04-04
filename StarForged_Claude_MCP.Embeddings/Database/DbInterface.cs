@@ -81,6 +81,12 @@ public class DbInterface
             new { Id = id });
     }
 
+    public async Task DeleteAllEmbeddings()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Embeddings");
+    }
+
     internal async Task<List<VectorResult>> GetAllVectors()
     {
         using var connection = new SqlConnection(_connectionString);

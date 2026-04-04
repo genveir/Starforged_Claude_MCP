@@ -104,6 +104,8 @@ public class McpServerTests : IClassFixture<TestFixture>
     [Fact]
     public async Task Search_WithValidQuery_ShouldReturnResults()
     {
+        await ClearTestMemories();
+
         await AddTestMemory("The wizard cast a powerful fireball spell.", "test_search");
         await AddTestMemory("The rogue snuck past the guards silently.", "test_search");
 
@@ -200,14 +202,17 @@ public class McpServerTests : IClassFixture<TestFixture>
     {
         var sourceDoc = "test_semantic_relevance";
 
-        await AddTestMemory("The coral reef teems with colorful tropical fish and sea anemones.", sourceDoc);
-        await AddTestMemory("Dolphins are highly intelligent marine mammals that live in the ocean.", sourceDoc);
+        await ClearTestMemories();
 
         await AddTestMemory("The blacksmith hammered the glowing iron on the anvil.", sourceDoc);
         await AddTestMemory("She baked a sourdough loaf with rosemary and sea salt.", sourceDoc);
         await AddTestMemory("The spacecraft entered orbit around the red planet.", sourceDoc);
         await AddTestMemory("A dense fog rolled over the mountain peaks at dawn.", sourceDoc);
         await AddTestMemory("The chess grandmaster sacrificed his queen to secure the endgame.", sourceDoc);
+
+        await AddTestMemory("The coral reef teems with colorful tropical fish and sea anemones.", sourceDoc);
+        await AddTestMemory("Dolphins are highly intelligent marine mammals that live in the ocean.", sourceDoc);
+
         await AddTestMemory("Lightning struck the old oak tree at the edge of the field.", sourceDoc);
         await AddTestMemory("The orchestra performed Beethoven's Fifth Symphony to a standing ovation.", sourceDoc);
         await AddTestMemory("He debugged the memory leak by profiling heap allocations.", sourceDoc);
@@ -255,6 +260,12 @@ public class McpServerTests : IClassFixture<TestFixture>
         results.Should().HaveCount(2);
         results.Should().Contain("The coral reef teems with colorful tropical fish and sea anemones.");
         results.Should().Contain("Dolphins are highly intelligent marine mammals that live in the ocean.");
+    }
+
+    private async Task ClearTestMemories()
+    {
+        var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
+        await dbInterface.DeleteAllEmbeddings();
     }
 
     private async Task AddTestMemory(string text, string sourceDocument)
