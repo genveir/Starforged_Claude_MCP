@@ -3,7 +3,7 @@ using StarForged_Claude_MCP.Embeddings.Services;
 using System.Collections.Concurrent;
 using System.Text;
 
-namespace StarForged_Claude_MCP.DirectUpload;
+namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
 public class FileUploader
 {
@@ -21,7 +21,25 @@ public class FileUploader
         this.beatPreprocessor = beatPreprocessor;
     }
 
-    public async Task UploadFolderAsync(string folderPath, SinkType sink, bool beatLogging)
+    public async Task UploadFile(UploadOptions options, CancellationToken cancellationToken)
+    {
+        if (options.Mode == UploadMode.Folder && !Directory.Exists(options.FolderPath))
+        {
+            Console.Error.WriteLine($"Error: Folder '{options.FolderPath}' does not exist.");
+            return;
+        }
+
+        if (options.Mode == UploadMode.Folder)
+            await UploadFolderAsync(options.FolderPath!, options.Sink, options.BeatLogging);
+        else if (options.Mode == UploadMode.Continuous)
+            await RunContinuousAsync(options.SourceDocument!, options.Sink, options.BeatLogging, cancellationToken);
+        else
+        {
+            throw new ArgumentException($"Invalid upload mode {options.Mode.ToString()}");
+        }
+    }
+
+    private async Task UploadFolderAsync(string folderPath, SinkType sink, bool beatLogging)
     {
         var files = Directory.GetFiles(folderPath, "*.md", SearchOption.AllDirectories);
 
@@ -45,7 +63,7 @@ public class FileUploader
         Console.WriteLine($"\nCompleted! Total items uploaded: {totalCount}");
     }
 
-    public async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, CancellationToken cancellationToken)
+    private async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, CancellationToken cancellationToken)
     {
         var lines = new ConcurrentQueue<string>();
         var dataAvailable = new SemaphoreSlim(0);

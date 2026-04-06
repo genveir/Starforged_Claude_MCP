@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.37012.4
@@ -7,7 +7,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.Embed
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.Server", "StarForged_Claude_MCP.Server\StarForged_Claude_MCP.Server.csproj", "{0C27540F-D2B2-41B0-A4AC-CF727F4DB665}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.DirectUpload", "StarForged_Claude_MCP.DirectUpload\StarForged_Claude_MCP.DirectUpload.csproj", "{C845689F-CD9A-4E50-BA71-6770318FCAD3}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.ConsoleAccess", "StarForged_Claude_MCP.ConsoleAccess\StarForged_Claude_MCP.ConsoleAccess.csproj", "{C845689F-CD9A-4E50-BA71-6770318FCAD3}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StarForged_Claude_MCP.Tests", "StarForged_Claude_MCP.Tests\StarForged_Claude_MCP.Tests.csproj", "{2CD091B6-3976-4C53-86E0-21B474BBA24D}"
 EndProject

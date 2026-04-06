@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace StarForged_Claude_MCP.DirectUpload;
+namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
 public class BeatPreprocessor
 {
