@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
@@ -22,6 +23,7 @@ public class Program
         builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 
         builder.Services.AddSingleton<FileUploader>();
+        builder.Services.AddSingleton<FileDownloader>();
         builder.Services.AddSingleton<BeatPreprocessor>();
         builder.Services.AddEmbeddingsServices();
 
@@ -42,12 +44,16 @@ public class Program
         }
 
         var uploader = host.Services.GetRequiredService<FileUploader>();
+        var downloader = host.Services.GetRequiredService<FileDownloader>();
         var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
         switch (options)
         {
             case UploadOptions uploadOptions:
                 await uploader.UploadFile(uploadOptions, lifetime.ApplicationStopping);
+                break;
+            case DownloadOptions downloadOptions:
+                await downloader.DownloadFile(downloadOptions);
                 break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
@@ -66,6 +72,7 @@ public class Program
         return args[0].ToLower() switch
         {
             "upload" => UploadOptions.Parse(args.Skip(1).ToArray()),
+            "download" => DownloadOptions.Parse(args.Skip(1).ToArray()),
             _ => HandleInvalidCommand(args[0])
         };
 
@@ -82,6 +89,7 @@ public class Program
         Console.WriteLine("Usage:");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --folder <path> [--embedded | --document]");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --continuous <sourceDocument> [--embedded | --document] [--beatLogging]");
+        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload download <sourceDocument>");
         Console.WriteLine();
     }
 
