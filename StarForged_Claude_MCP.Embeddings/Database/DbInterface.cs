@@ -21,28 +21,11 @@ public class DbInterface
         using var connection = new SqlConnection(_connectionString);
         var id = await connection.QuerySingleAsync<int>(
             "insert into Embeddings (Text, Vector, SourceDocument, TokenCount) output inserted.Id values (@Text, @Vector, @SourceDocument, @TokenCount)",
-            new { Text = chunk.DisplayText, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length });
+            new { Text = chunk.Text, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length });
         return id;
     }
 
-    public async Task<TextResult?> GetText(int id)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var result = await connection.QuerySingleOrDefaultAsync<dynamic>(
-            "select Id, Text, SourceDocument from Embeddings where Id = @Id",
-            new { Id = id });
-
-        if (result == null) return null;
-
-        return new TextResult
-        {
-            Id = result.Id,
-            Text = result.Text,
-            SourceDocument = result.SourceDocument
-        };
-    }
-
-    public async Task<List<TextResult>> GetTextByIds(int[] ids)
+    public async Task<List<TextResult>> GetEmbeddedTextByIds(int[] ids)
     {
         if (ids.Length == 0) return [];
 
@@ -59,32 +42,49 @@ public class DbInterface
         }).ToList();
     }
 
-    public async Task<List<TextResult>> GetTextBySourceDocument(string sourceDocument)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
-            "select Id, Text, SourceDocument from Embeddings where SourceDocument = @SourceDocument",
-            new { SourceDocument = sourceDocument });
-        return results.Select(r => new TextResult
-        {
-            Id = r.Id,
-            Text = r.Text,
-            SourceDocument = r.SourceDocument
-        }).ToList();
-    }
-
-    public async Task DeleteEmbedding(int id)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync(
-            "delete from Embeddings where Id = @Id",
-            new { Id = id });
-    }
-
     public async Task DeleteAllEmbeddings()
     {
         using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync("delete from Embeddings");
+    }
+
+    public async Task DeleteAllDocuments()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Documents");
+    }
+
+    public async Task StoreDocument(string content, string sourceDocument, string? beatNumber = null)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync(
+            "insert into Documents (Content, SourceDocument, BeatNumber) values (@Content, @SourceDocument, @BeatNumber)",
+            new { Content = content, SourceDocument = sourceDocument, BeatNumber = beatNumber });
+    }
+
+    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<dynamic>(
+            "select Content, SourceDocument, BeatNumber from Documents where SourceDocument = @SourceDocument order by Id",
+            new { SourceDocument = sourceDocument });
+
+        int sequence = 1;
+        return results.Select(r => new DocumentResult
+        {
+            Content = r.Content,
+            Sequence = sequence++,
+            BeatNumber = (string?)r.BeatNumber
+        }).ToList();
+    }
+
+    public async Task<List<string?>> GetBeats(string sourceDocument)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<string?>(
+            "select BeatNumber from Documents where SourceDocument = @SourceDocument order by Id",
+            new { SourceDocument = sourceDocument });
+        return results.ToList();
     }
 
     internal async Task<List<VectorResult>> GetAllVectors()

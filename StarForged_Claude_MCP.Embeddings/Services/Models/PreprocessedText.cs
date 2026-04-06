@@ -2,12 +2,7 @@
 {
     public record Token(long InputIds, long AttentionMask, long TokenTypeIds);
 
-    public record PreprocessedText(
-            Chunk[] Chunks
-        );
+    public record PreprocessedText(Chunk[] Chunks);
 
-    public record Chunk(
-        Token[] Tokens,
-        string EmbedText,
-        string DisplayText);
+    public record Chunk(Token[] Tokens, string Text);
 }

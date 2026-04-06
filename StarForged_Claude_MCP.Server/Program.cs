@@ -13,6 +13,9 @@ public class Program
 {
     public static async Task Main(string[] args)
     {
+        Console.InputEncoding = System.Text.Encoding.UTF8;
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
         Log.Logger = new LoggerConfiguration()
             .MinimumLevel.Debug()
             .WriteTo.File(
@@ -44,6 +47,7 @@ public class Program
         builder.Services.AddEmbeddingsServices();
 
         builder.Services.AddSingleton<EmbeddingsFacade>();
+        builder.Services.AddSingleton<DocumentsFacade>();
         builder.Services.AddSingleton<McpServer>();
 
         var host = builder.Build();

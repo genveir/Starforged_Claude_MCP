@@ -31,7 +31,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services.Preprocessing
                 tokens = tokens[..MaxTokens];
             }
 
-            return new PreprocessedText([new Chunk(tokens, text, text)]);
+            return new PreprocessedText([new Chunk(tokens, text)]);
         }
     }
 }

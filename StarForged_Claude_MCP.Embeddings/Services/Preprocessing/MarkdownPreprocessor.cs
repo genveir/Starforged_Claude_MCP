@@ -20,8 +20,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         List<Chunk> chunks = [.. processorChunks.Select(pc =>
             new Chunk(
                 Tokens: pc.Tokens,
-                EmbedText: pc.Breadcrumb + "\n" + pc.Text,
-                DisplayText: pc.Text))];
+                Text: string.IsNullOrEmpty(pc.Breadcrumb) ? pc.Text : pc.Breadcrumb + "\n" + pc.Text))];
 
         return new PreprocessedText(Chunks: [.. chunks]);
     }
@@ -330,6 +329,14 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
     {
         public ProcessorChunk(string[] lines, string?[] breadcrumbParts)
         {
+            for (int i = 0; i < breadcrumbParts.Length; i++)
+            {
+                if (breadcrumbParts[i] != null)
+                {
+                    breadcrumbParts[i] = breadcrumbParts[i]!.Trim([' ', '#', '*']);
+                }
+            }
+
             Lines = [.. lines];
             BreadcrumbParts = [.. breadcrumbParts];
         }
@@ -340,13 +347,22 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
         private Token[]? _tokens = null;
 
         public string Text => string.Join('\n', Lines);
-        public string Breadcrumb => string.Join(" > ", BreadcrumbParts.Where(bp => !string.IsNullOrEmpty(bp)));
+        public string Breadcrumb
+        {
+            get
+            {
+                var parts = BreadcrumbParts.Where(bp => !string.IsNullOrEmpty(bp)).ToArray();
+                return parts.Length > 0 ? string.Join(" > ", parts) + ":" : string.Empty;
+            }
+        }
+
+        private string TextWithBreadcrumb => string.IsNullOrEmpty(Breadcrumb) ? Text : Breadcrumb + '\n' + Text;
 
         public Token[] Tokens
         {
             get
             {
-                _tokens ??= Tokenizer.GetTokensForCount(Breadcrumb + '\n' + Text);
+                _tokens ??= Tokenizer.GetTokensForCount(TextWithBreadcrumb);
 
                 return _tokens;
             }
@@ -354,7 +370,7 @@ public class MarkdownPreprocessor : IDocumentPreprocessor
 
         public void FinalizeTokens()
         {
-            _tokens = Tokenizer.Tokenize(Breadcrumb + '\n' + Text);
+            _tokens = Tokenizer.Tokenize(TextWithBreadcrumb);
         }
     }
 }

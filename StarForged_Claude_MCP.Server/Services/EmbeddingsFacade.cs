@@ -1,5 +1,6 @@
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Services;
+using StarForged_Claude_MCP.Embeddings.Services.Models;
 
 namespace StarForged_Claude_MCP.Server.Services;
 
@@ -18,7 +19,7 @@ public class EmbeddingsFacade
         this.dbInterface = dbInterface;
     }
 
-    public async Task<string[]> SearchAsync(string query, int topK = 3) => await searchService.Search(query, topK);
+    public async Task<SearchResult[]> SearchAsync(string query, int topK = 3) => await searchService.Search(query, topK);
 
     public async Task<int[]> AddMemoryAsync(string text, string sourceDocument) =>
         await documentProcessingService.ProcessAndStoreDocumentAsync(text, sourceDocument, DocumentProcessorToUse.Markdown);

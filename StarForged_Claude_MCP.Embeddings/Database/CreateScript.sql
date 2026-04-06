@@ -11,3 +11,11 @@ create table Embeddings
     SourceDocument nvarchar(500) not null,
     TokenCount int not null
 );
+
+create table Documents
+(
+    Id int identity(1,1) primary key,
+    SourceDocument nvarchar(500) not null,
+    Content nvarchar(max) not null,
+    Beat nvarchar(20) null
+);

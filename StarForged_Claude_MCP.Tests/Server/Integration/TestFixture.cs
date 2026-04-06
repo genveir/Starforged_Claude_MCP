@@ -41,6 +41,7 @@ public class TestFixture : IAsyncLifetime
         services.AddEmbeddingsServices();
 
         services.AddSingleton<EmbeddingsFacade>();
+        services.AddSingleton<DocumentsFacade>();
         services.AddSingleton<McpServer>();
 
         services.AddSingleton<IConfiguration>(configuration);
@@ -95,6 +96,17 @@ public class TestFixture : IAsyncLifetime
                     Vector varbinary(max) not null,
                     SourceDocument nvarchar(500) not null,
                     TokenCount int not null
+                )
+            end
+
+            if not exists (select * from sys.tables where name = 'Documents')
+            begin
+                create table Documents
+                (
+                    Id int identity(1,1) primary key,
+                    SourceDocument nvarchar(500) not null,
+                    Content nvarchar(max) not null,
+                    BeatNumber nvarchar(20) null
                 )
             end";
 

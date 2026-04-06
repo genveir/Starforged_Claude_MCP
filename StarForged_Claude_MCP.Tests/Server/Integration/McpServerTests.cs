@@ -64,9 +64,12 @@ public class McpServerTests : IClassFixture<TestFixture>
 
         result.Should().NotBeNull();
         result.Tools.Should().NotBeNull();
-        result.Tools.Should().HaveCount(2);
+        result.Tools.Should().HaveCount(5);
         result.Tools.Should().Contain(t => t.Name == "search");
-        result.Tools.Should().Contain(t => t.Name == "add_memory");
+        result.Tools.Should().Contain(t => t.Name == "add_searchable");
+        result.Tools.Should().Contain(t => t.Name == "add_document");
+        result.Tools.Should().Contain(t => t.Name == "get_documents");
+        result.Tools.Should().Contain(t => t.Name == "get_canonical_beats");
     }
 
     [Fact]
@@ -93,12 +96,18 @@ public class McpServerTests : IClassFixture<TestFixture>
         response.Id.Should().Be("3");
         response.Error.Should().BeNull();
 
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(response.Result, _jsonOptions),
+            _jsonOptions);
+
+        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
+        var ids = toolResponse.GetProperty("id").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+
         var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
-        var storedResult = await dbInterface.GetTextBySourceDocument("test_campaign");
+        var storedResult = await dbInterface.GetEmbeddedTextByIds(ids);
 
         storedResult.Should().NotBeNull();
         storedResult.Should().HaveCount(1);
-
         storedResult.Single().Text.Should().Be("The ancient dragon sleeps in the mountain.");
     }
 
@@ -145,7 +154,7 @@ public class McpServerTests : IClassFixture<TestFixture>
         var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
         var results = searchResponse.GetProperty("results")
             .EnumerateArray()
-            .Select(e => e.GetString())
+            .Select(e => e.GetProperty("text").GetString())
             .ToArray();
 
         results.Should().Contain("The wizard cast a powerful fireball spell.");
@@ -255,7 +264,7 @@ public class McpServerTests : IClassFixture<TestFixture>
         var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
         var results = searchResponse.GetProperty("results")
             .EnumerateArray()
-            .Select(e => e.GetString())
+            .Select(e => e.GetProperty("text").GetString())
             .ToArray();
 
         results.Should().HaveCount(2);
@@ -290,6 +299,179 @@ public class McpServerTests : IClassFixture<TestFixture>
 
         var response = await InvokeServerMethod(request);
         response.Error.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddDocument_ShouldStore()
+    {
+        await ClearTestDocuments();
+
+        var request = new JsonRpcRequest
+        {
+            Id = "8",
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "add_document",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "text", "The hero entered the tavern at midnight." },
+                    { "sourceDocument", "test_doc_store" }
+                }
+            }
+        };
+
+        var response = await InvokeServerMethod(request);
+
+        response.Should().NotBeNull();
+        response.Id.Should().Be("8");
+        response.Error.Should().BeNull();
+
+        var getRequest = new JsonRpcRequest
+        {
+            Id = "9",
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "get_documents",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "sourceDocument", "test_doc_store" }
+                }
+            }
+        };
+
+        var getResponse = await InvokeServerMethod(getRequest);
+
+        getResponse.Error.Should().BeNull();
+
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(getResponse.Result, _jsonOptions),
+            _jsonOptions);
+
+        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
+        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
+
+        documents.Should().HaveCount(1);
+        documents[0].GetProperty("content").GetString().Should().Be("The hero entered the tavern at midnight.");
+    }
+
+    [Fact]
+    public async Task GetDocuments_ShouldReturnInOrder()
+    {
+        await ClearTestDocuments();
+
+        await AddTestDocument("First session: the party met in Ironhaven.", "test_doc_order");
+        await AddTestDocument("Second session: the party travelled to the forest.", "test_doc_order");
+        await AddTestDocument("Third session: the dragon was defeated.", "test_doc_order");
+
+        var request = new JsonRpcRequest
+        {
+            Id = "10",
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "get_documents",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "sourceDocument", "test_doc_order" }
+                }
+            }
+        };
+
+        var response = await InvokeServerMethod(request);
+
+        response.Should().NotBeNull();
+        response.Id.Should().Be("10");
+        response.Error.Should().BeNull();
+
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(response.Result, _jsonOptions),
+            _jsonOptions);
+
+        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
+        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
+
+        documents.Should().HaveCount(3);
+        documents[0].GetProperty("content").GetString().Should().Be("First session: the party met in Ironhaven.");
+        documents[0].GetProperty("sequence").GetInt32().Should().Be(1);
+        documents[1].GetProperty("content").GetString().Should().Be("Second session: the party travelled to the forest.");
+        documents[1].GetProperty("sequence").GetInt32().Should().Be(2);
+        documents[2].GetProperty("content").GetString().Should().Be("Third session: the dragon was defeated.");
+        documents[2].GetProperty("sequence").GetInt32().Should().Be(3);
+    }
+
+    [Fact]
+    public async Task GetCanonicalBeats_ShouldReturnBeatsForSession()
+    {
+        await ClearTestDocuments();
+
+        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_5", null);
+        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_5", "1.0");
+        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_5", "2.0");
+        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_5", "2.1");
+        await AddTestDocument("Meanwhile, the rival adventuring party plotted in the shadows.", "SessionBeats_5", null);
+        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_5", "3.0");
+
+        var request = new JsonRpcRequest
+        {
+            Id = "11",
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "get_canonical_beats",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "sessionNumber", 5 }
+                }
+            }
+        };
+
+        var response = await InvokeServerMethod(request);
+
+        response.Should().NotBeNull();
+        response.Id.Should().Be("11");
+        response.Error.Should().BeNull();
+
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(response.Result, _jsonOptions),
+            _jsonOptions);
+
+        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
+        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
+
+        documents.Should().HaveCount(5);
+        checkDocument(documents[0], "Prologue: the party received a mysterious invitation.", 1, null);
+        checkDocument(documents[1], "The party arrived in the city of Ironhaven.", 2, "1.0");
+        checkDocument(documents[2], "They discovered the butcher was a spy.", 3, "2.1");
+        checkDocument(documents[3], "Meanwhile, the rival adventuring party plotted in the shadows.", 4, null);
+        checkDocument(documents[4], "A chase through the market ended with an arrest.", 5, "3.0");
+
+        void checkDocument(JsonElement doc, string expectedContent, int expectedSequence, string? expectedBeatNumber)
+        {
+            doc.GetProperty("content").GetString().Should().Be(expectedContent);
+            doc.GetProperty("sequence").GetInt32().Should().Be(expectedSequence);
+            if (expectedBeatNumber == null)
+            {
+                doc.TryGetProperty("beatNumber", out var beatNumberProp).Should().BeFalse();
+            }
+            else
+            {
+                doc.GetProperty("beatNumber").GetString().Should().Be(expectedBeatNumber);
+            }
+        }
+    }
+
+    private async Task ClearTestDocuments()
+    {
+        var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
+        await dbInterface.DeleteAllDocuments();
+    }
+
+    private async Task AddTestDocument(string text, string sourceDocument, string? beatNumber = null)
+    {
+        var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
+        await dbInterface.StoreDocument(text, sourceDocument, beatNumber);
     }
 
     private async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request)

@@ -7,7 +7,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 {
     public interface ISearchService
     {
-        Task<string[]> Search(string input, int topK);
+        Task<SearchResult[]> Search(string input, int topK);
     }
 
     internal class SearchService : ISearchService
@@ -31,25 +31,26 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             this.logger = logger;
         }
 
-        public async Task<string[]> Search(string input, int topK)
+        public async Task<SearchResult[]> Search(string input, int topK)
         {
             logger.LogInformation("Starting search with input: {Input} and topK: {TopK}", input, topK);
 
             var inputChunk = unchunkableFlatTextPreprocessor.Process(input).Chunks.Single();
 
-            var ids = await PerformSimilaritySearch(inputChunk, topK);
+            var similarityResults = await PerformSimilaritySearch(inputChunk, topK);
 
-            var textResults = await dbInterface.GetTextByIds(ids);
+            var ids = similarityResults.Select(r => r.Id).ToArray();
 
-            var results = ids
-                .Select(id => textResults.FirstOrDefault(e => e.Id == id)?.Text)
-                .OfType<string>()
+            var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
+
+            var results = similarityResults
+                .Join(textResults, sim => sim.Id, text => text.Id, (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore))
                 .ToArray();
 
             return results;
         }
 
-        private async Task<int[]> PerformSimilaritySearch(Chunk input, int topK)
+        private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, int topK)
         {
             var queryVector = embeddingsService.GenerateEmbeddings(input);
 
@@ -63,7 +64,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
                 .Select(kvp => new { Id = kvp.Key, Similarity = CosineSimilarity(queryVector, kvp.Value) })
                 .OrderByDescending(x => x.Similarity)
                 .Take(topK)
-                .Select(x => x.Id)
+                .Select(x => new SimilarityResult(Id: x.Id, SimilarityScore: x.Similarity))
                 .ToArray();
 
             logger.LogInformation("Similarity search completed. Top {TopK} IDs: {Ids}", topK, similarities);
