@@ -44,7 +44,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
 
             var results = similarityResults
-                .Join(textResults, sim => sim.Id, text => text.Id, (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore))
+                .Join(textResults, sim => sim.Id, text => text.Id, (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id))
                 .ToArray();
 
             return results;

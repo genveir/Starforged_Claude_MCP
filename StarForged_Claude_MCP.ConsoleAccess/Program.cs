@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
+using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
@@ -24,6 +25,7 @@ public class Program
 
         builder.Services.AddSingleton<FileUploader>();
         builder.Services.AddSingleton<FileDownloader>();
+        builder.Services.AddSingleton<Searcher>();
         builder.Services.AddSingleton<BeatPreprocessor>();
         builder.Services.AddEmbeddingsServices();
 
@@ -45,6 +47,7 @@ public class Program
 
         var uploader = host.Services.GetRequiredService<FileUploader>();
         var downloader = host.Services.GetRequiredService<FileDownloader>();
+        var searcher = host.Services.GetRequiredService<Searcher>();
         var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
         switch (options)
@@ -54,6 +57,9 @@ public class Program
                 break;
             case DownloadOptions downloadOptions:
                 await downloader.DownloadFile(downloadOptions);
+                break;
+            case SearchOptions searchOptions:
+                await searcher.Search(searchOptions);
                 break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
@@ -73,6 +79,7 @@ public class Program
         {
             "upload" => UploadOptions.Parse(args.Skip(1).ToArray()),
             "download" => DownloadOptions.Parse(args.Skip(1).ToArray()),
+            "search" => SearchOptions.Parse(args.Skip(1).ToArray()),
             _ => HandleInvalidCommand(args[0])
         };
 
@@ -90,6 +97,7 @@ public class Program
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --folder <path> [--embedded | --document]");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --continuous <sourceDocument> [--embedded | --document] [--beatLogging]");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload download <sourceDocument>");
+        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload search <searchString> [-t <topK>]");
         Console.WriteLine();
     }
 

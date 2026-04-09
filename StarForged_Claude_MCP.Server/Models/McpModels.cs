@@ -26,7 +26,7 @@ public class ClientInfo
 public class InitializeResult
 {
     [JsonPropertyName("protocolVersion")]
-    public string ProtocolVersion { get; set; } = "2024-11-05";
+    public string ProtocolVersion { get; set; } = "2025-11-25";
 
     [JsonPropertyName("capabilities")]
     public ServerCapabilities Capabilities { get; set; } = new();
