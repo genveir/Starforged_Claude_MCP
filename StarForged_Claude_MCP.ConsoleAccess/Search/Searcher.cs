@@ -41,27 +41,6 @@ public class Searcher
 
     private static void OutputBriefResult(SearchResult result)
     {
-        var colonIndex = result.Text.IndexOf(':');
-
-        string breadcrumbs = colonIndex < 0 ? string.Empty : result.Text[..colonIndex];
-        string content = colonIndex < 0 ? result.Text : result.Text[(colonIndex + 1)..].TrimStart();
-
-        var sentenceEnd = content.IndexOfAny(['.', '!', '?', '\n']);
-        string contentSummary;
-        if (sentenceEnd < 0)
-        {
-            contentSummary = content;
-        }
-        else
-        {
-            contentSummary = content[..(sentenceEnd + 1)];
-            if (contentSummary.Split(' ', StringSplitOptions.RemoveEmptyEntries).Length < 10)
-            {
-                var secondEnd = content.IndexOfAny(['.', '!', '?', '\n'], sentenceEnd + 1);
-                if (secondEnd >= 0) contentSummary = content[..(secondEnd + 1)];
-            }
-        }
-
-        Console.WriteLine($"[Id: {result.Id}, Score: {result.SimilarityScore}] {breadcrumbs}: {contentSummary}");
+        Console.WriteLine($"[Id: {result.Id}, Score: {result.SimilarityScore}] {result.BriefSummary}");
     }
 }

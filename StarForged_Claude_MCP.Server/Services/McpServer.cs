@@ -103,8 +103,8 @@ public class McpServer
         {
             new()
             {
-                Name = "search",
-                Description = "Search for relevant campaign information using semantic similarity",
+                Name = "search_index",
+                Description = "Search for relevant chunks by semantic similarity. Returns IDs, scores, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs",
                 InputSchema = new
                 {
                     type = "object",
@@ -158,6 +158,20 @@ public class McpServer
                         sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" }
                     },
                     required = new[] { "sourceDocument" }
+                }
+            },
+            new()
+            {
+                Name = "retrieve_search_results",
+                Description = "Retrieves full chunk text by ID. Results are returned in the exact same order as the provided IDs. IDs not found in the database are omitted. Use this after search_index to fetch full content for relevant IDs.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        ids = new { type = "array", items = new { type = "number" }, description = "Array of chunk IDs to retrieve, as returned by search_index. Results will be returned in this exact order." }
+                    },
+                    required = new[] { "ids" }
                 }
             },
             new()
@@ -248,7 +262,8 @@ public class McpServer
     {
         return toolName switch
         {
-            "search" => await ExecuteSearchAsync(arguments),
+            "search_index" => await ExecuteSearchAsync(arguments),
+            "retrieve_search_results" => await ExecuteRetrieveSearchResultsAsync(arguments),
             "add_memory" => await ExecuteAddMemoryAsync(arguments),
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "get_documents" => await ExecuteGetDocumentsAsync(arguments),
@@ -277,6 +292,35 @@ public class McpServer
         _logger.LogDebug("Executing search: query length={QueryLength}, topK={TopK}", query.Length, topK);
         var results = await _embeddings.SearchAsync(query, topK);
         _logger.LogDebug("Search returned {ResultCount} result(s)", results.Length);
+        var briefResults = results.Select(r => new
+        {
+            id = r.Id,
+            score = r.SimilarityScore,
+            summary = r.BriefSummary
+        }).ToArray();
+        return JsonSerializer.Serialize(new { results = briefResults }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteRetrieveSearchResultsAsync(Dictionary<string, object> arguments)
+    {
+        int[] ids;
+        if (arguments["ids"] is JsonElement je)
+        {
+            ids = je.EnumerateArray().Select(e => e.GetInt32()).ToArray();
+        }
+        else
+        {
+            ids = ((IEnumerable<object>)arguments["ids"]).Select(e => Convert.ToInt32(e)).ToArray();
+        }
+
+        if (ids.Length == 0)
+            throw new ArgumentException("Ids cannot be empty");
+        if (ids.Length > 50)
+            throw new ArgumentException("Cannot retrieve more than 50 ids at once");
+
+        _logger.LogDebug("Executing retrieve_search_results: {IdCount} id(s)", ids.Length);
+        var results = await _embeddings.RetrieveByIdsAsync(ids);
+        _logger.LogDebug("retrieve_search_results returned {ResultCount} result(s)", results.Length);
         return JsonSerializer.Serialize(new { results }, _jsonOptions);
     }
 

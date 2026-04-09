@@ -1,4 +1,5 @@
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 
@@ -23,4 +24,14 @@ public class EmbeddingsFacade
 
     public async Task<int[]> AddMemoryAsync(string text, string sourceDocument) =>
         await documentProcessingService.ProcessAndStoreDocumentAsync(text, sourceDocument, DocumentProcessorToUse.Markdown);
+
+    public async Task<TextResult[]> RetrieveByIdsAsync(int[] ids)
+    {
+        var results = await dbInterface.GetEmbeddedTextByIds(ids);
+        var byId = results.ToDictionary(r => r.Id);
+        return ids
+            .Where(id => byId.ContainsKey(id))
+            .Select(id => byId[id])
+            .ToArray();
+    }
 }
