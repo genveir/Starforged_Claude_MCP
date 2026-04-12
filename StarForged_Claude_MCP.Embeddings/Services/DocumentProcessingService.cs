@@ -52,9 +52,10 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             {
                 var embedding = embeddingsService.GenerateEmbeddings(chunk);
 
-                var vectors = await vectorCache.GetAllVectors();
-                if (vectors.ContainsValue(embedding))
+                var existingId = await vectorCache.FindExistingVector(embedding);
+                if (existingId.HasValue)
                 {
+                    storedChunkIds.Add(existingId.Value);
                     continue;
                 }
 
