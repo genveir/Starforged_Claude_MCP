@@ -17,4 +17,7 @@ public class DocumentsFacade
 
     public async Task<List<DocumentResult>> GetDocumentsAsync(string sourceDocument) =>
         await _dbInterface.GetAllDocumentsForSourceDocument(sourceDocument);
+
+    public async Task<List<string>> GetDocumentIndexAsync() =>
+        await _dbInterface.GetDistinctSourceDocuments();
 }

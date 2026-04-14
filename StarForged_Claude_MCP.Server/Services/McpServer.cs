@@ -176,6 +176,16 @@ public class McpServer
             },
             new()
             {
+                Name = "document_index",
+                Description = "Returns the distinct sourceDocuments stored in the document store.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new { }
+                }
+            },
+            new()
+            {
                 Name = "get_canonical_beats",
                 Description = "Retrieves the canonical beats for a given session in the order they were added. Stored documents are full GM responses; beats are embedded within them alongside mechanical confirmations and conversational content.",
                 InputSchema = new
@@ -268,6 +278,7 @@ public class McpServer
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "get_documents" => await ExecuteGetDocumentsAsync(arguments),
             "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
+            "document_index" => await ExecuteDocumentIndexAsync(),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
         };
     }
@@ -400,6 +411,14 @@ public class McpServer
         var documents = FilterCanonicalBeats(allDocuments);
         _logger.LogDebug("get_canonical_beats returned {DocumentCount} document(s) for sessionNumber={SessionNumber}", documents.Count, sessionNumber);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteDocumentIndexAsync()
+    {
+        _logger.LogDebug("Executing document_index");
+        var sourceDocuments = await _documents.GetDocumentIndexAsync();
+        _logger.LogDebug("document_index returned {Count} source document(s)", sourceDocuments.Count);
+        return JsonSerializer.Serialize(new { sourceDocuments }, _jsonOptions);
     }
 
     private static List<DocumentResult> FilterCanonicalBeats(List<DocumentResult> documents)

@@ -78,6 +78,14 @@ public class DbInterface
         }).ToList();
     }
 
+    public async Task<List<string>> GetDistinctSourceDocuments()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<string>(
+            "select distinct SourceDocument from Documents order by SourceDocument");
+        return results.ToList();
+    }
+
     public async Task<List<string?>> GetBeats(string sourceDocument)
     {
         using var connection = new SqlConnection(_connectionString);
