@@ -141,7 +141,9 @@ public class McpServer
                     properties = new
                     {
                         text = new { type = "string", description = "The content to store" },
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" }
+                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
+                        summary = new { type = "string", description = "Optional short summary of this document, surfaced in document_index" },
+                        category = new { type = "string", description = "Optional category label, can be used to filter results in get_documents" }
                     },
                     required = new[] { "text", "sourceDocument" }
                 }
@@ -155,7 +157,8 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" }
+                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
+                        category = new { type = "string", description = "Optional category filter; when provided only documents with a matching category are returned" }
                     },
                     required = new[] { "sourceDocument" }
                 }
@@ -181,7 +184,10 @@ public class McpServer
                 InputSchema = new
                 {
                     type = "object",
-                    properties = new { }
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Optional category filter; when provided only sourceDocuments containing documents with a matching category are returned" }
+                    }
                 }
             },
             new()
@@ -193,7 +199,8 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        sessionNumber = new { type = "number", description = "The session number to retrieve beats for" }
+                        sessionNumber = new { type = "number", description = "The session number to retrieve beats for" },
+                        category = new { type = "string", description = "Optional category filter; when provided only beats with a matching category are returned" }
                     },
                     required = new[] { "sessionNumber" }
                 }
@@ -278,7 +285,7 @@ public class McpServer
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "get_documents" => await ExecuteGetDocumentsAsync(arguments),
             "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
-            "document_index" => await ExecuteDocumentIndexAsync(),
+            "document_index" => await ExecuteDocumentIndexAsync(arguments),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
         };
     }
@@ -367,6 +374,8 @@ public class McpServer
     {
         var text = arguments["text"].ToString() ?? "";
         var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
+        var summary = arguments.TryGetValue("summary", out var s) ? s?.ToString() : null;
+        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
 
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Text cannot be empty");
@@ -376,9 +385,11 @@ public class McpServer
             throw new ArgumentException("SourceDocument cannot be empty");
         if (sourceDocument.Length > 500)
             throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
+        if (category?.Length > 200)
+            throw new ArgumentException("Category exceeds maximum length of 200 characters");
 
         _logger.LogDebug("Executing add_document: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
-        await _documents.StoreDocumentAsync(text, sourceDocument);
+        await _documents.StoreDocumentAsync(text, sourceDocument, summary: summary, category: category);
         _logger.LogDebug("add_document stored document for sourceDocument={SourceDocument}", sourceDocument);
         return JsonSerializer.Serialize(new { message = "Document stored successfully" }, _jsonOptions);
     }
@@ -386,6 +397,7 @@ public class McpServer
     private async Task<string> ExecuteGetDocumentsAsync(Dictionary<string, object> arguments)
     {
         var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
+        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
 
         if (string.IsNullOrWhiteSpace(sourceDocument))
             throw new ArgumentException("SourceDocument cannot be empty");
@@ -393,7 +405,7 @@ public class McpServer
             throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
 
         _logger.LogDebug("Executing get_documents: sourceDocument={SourceDocument}", sourceDocument);
-        var documents = await _documents.GetDocumentsAsync(sourceDocument);
+        var documents = await _documents.GetDocumentsAsync(sourceDocument, category);
         _logger.LogDebug("get_documents returned {DocumentCount} document(s) for sourceDocument={SourceDocument}", documents.Count, sourceDocument);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
     }
@@ -403,23 +415,27 @@ public class McpServer
         var sessionNumber = arguments["sessionNumber"] is JsonElement je
             ? je.GetInt32()
             : Convert.ToInt32(arguments["sessionNumber"]);
+        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
 
         var sourceDocument = $"SessionBeats_{sessionNumber}";
 
         _logger.LogDebug("Executing get_canonical_beats: sessionNumber={SessionNumber}", sessionNumber);
-        var allDocuments = await _documents.GetDocumentsAsync(sourceDocument);
+        var allDocuments = await _documents.GetDocumentsAsync(sourceDocument, category);
         var documents = FilterCanonicalBeats(allDocuments);
         _logger.LogDebug("get_canonical_beats returned {DocumentCount} document(s) for sessionNumber={SessionNumber}", documents.Count, sessionNumber);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
     }
 
-    private async Task<string> ExecuteDocumentIndexAsync()
+    private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
     {
+        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+
         _logger.LogDebug("Executing document_index");
-        var sourceDocuments = await _documents.GetDocumentIndexAsync();
+        var sourceDocuments = await _documents.GetDocumentIndexAsync(category);
         _logger.LogDebug("document_index returned {Count} source document(s)", sourceDocuments.Count);
         return JsonSerializer.Serialize(new { sourceDocuments }, _jsonOptions);
     }
+
 
     private static List<DocumentResult> FilterCanonicalBeats(List<DocumentResult> documents)
     {

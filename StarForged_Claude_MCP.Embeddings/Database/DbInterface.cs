@@ -54,36 +54,55 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Documents");
     }
 
-    public async Task StoreDocument(string content, string sourceDocument, string? beatNumber = null)
+    public async Task StoreDocument(string content, string sourceDocument, string? beatNumber = null, string? summary = null, string? category = null)
     {
         using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync(
-            "insert into Documents (Content, SourceDocument, BeatNumber) values (@Content, @SourceDocument, @BeatNumber)",
-            new { Content = content, SourceDocument = sourceDocument, BeatNumber = beatNumber });
+            "insert into Documents (Content, SourceDocument, BeatNumber, Summary, Category) values (@Content, @SourceDocument, @BeatNumber, @Summary, @Category)",
+            new { Content = content, SourceDocument = sourceDocument, BeatNumber = beatNumber, Summary = summary, Category = category });
     }
 
-    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument)
+    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument, string? category = null)
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "select Content, SourceDocument, BeatNumber from Documents where SourceDocument = @SourceDocument order by Id",
-            new { SourceDocument = sourceDocument });
+            "select Content, BeatNumber, Summary, Category from Documents where SourceDocument = @SourceDocument and ((@Category is null and Category is null) or Category = @Category) order by Id",
+            new { SourceDocument = sourceDocument, Category = category });
 
         int sequence = 1;
         return results.Select(r => new DocumentResult
         {
             Content = r.Content,
             Sequence = sequence++,
-            BeatNumber = (string?)r.BeatNumber
+            BeatNumber = (string?)r.BeatNumber,
+            Summary = (string?)r.Summary,
+            Category = (string?)r.Category
         }).ToList();
     }
 
-    public async Task<List<string>> GetDistinctSourceDocuments()
+    public async Task<List<DocumentIndexEntry>> GetDistinctSourceDocuments(string? category = null)
     {
         using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<string>(
-            "select distinct SourceDocument from Documents order by SourceDocument");
-        return results.ToList();
+        var results = await connection.QueryAsync<dynamic>(
+            """
+            with DistinctSummaries as (
+                select distinct SourceDocument, Summary
+                from Documents
+                where Summary is not null
+                and ((@Category is null and Category is null) or Category = @Category)
+            )
+            select d.SourceDocument, string_agg(ds.Summary, ', ') as Summaries
+            from (select distinct SourceDocument from Documents where ((@Category is null and Category is null) or Category = @Category)) d
+            left join DistinctSummaries ds on ds.SourceDocument = d.SourceDocument
+            group by d.SourceDocument
+            order by d.SourceDocument
+            """,
+            new { Category = category });
+        return results.Select(r => new DocumentIndexEntry
+        {
+            SourceDocument = r.SourceDocument,
+            Summaries = (string?)r.Summaries
+        }).ToList();
     }
 
     public async Task<List<string?>> GetBeats(string sourceDocument)

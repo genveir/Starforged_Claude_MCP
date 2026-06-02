@@ -17,5 +17,7 @@ create table Documents
     Id int identity(1,1) primary key,
     SourceDocument nvarchar(500) not null,
     Content nvarchar(max) not null,
-    Beat nvarchar(20) null
+    Beat nvarchar(20) null,
+    Summary nvarchar(512) null,
+    Category nvarchar(200) null
 );

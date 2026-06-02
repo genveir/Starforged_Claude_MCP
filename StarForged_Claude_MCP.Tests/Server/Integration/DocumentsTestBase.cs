@@ -13,9 +13,9 @@ public abstract class DocumentsTestBase : McpServerTestBase
         await dbInterface.DeleteAllDocuments();
     }
 
-    protected async Task AddTestDocument(string text, string sourceDocument, string? beatNumber = null)
+    protected async Task AddTestDocument(string text, string sourceDocument, string? beatNumber = null, string? summary = null, string? category = null)
     {
         var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
-        await dbInterface.StoreDocument(text, sourceDocument, beatNumber);
+        await dbInterface.StoreDocument(text, sourceDocument, beatNumber, summary, category);
     }
 }

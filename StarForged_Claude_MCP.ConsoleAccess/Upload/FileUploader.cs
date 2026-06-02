@@ -30,16 +30,16 @@ public class FileUploader
         }
 
         if (options.Mode == UploadMode.Folder)
-            await UploadFolderAsync(options.FolderPath!, options.Sink, options.BeatLogging);
+            await UploadFolderAsync(options.FolderPath!, options.Sink, options.BeatLogging, options.Category);
         else if (options.Mode == UploadMode.Continuous)
-            await RunContinuousAsync(options.SourceDocument!, options.Sink, options.BeatLogging, cancellationToken);
+            await RunContinuousAsync(options.SourceDocument!, options.Sink, options.BeatLogging, options.Category, cancellationToken);
         else
         {
             throw new ArgumentException($"Invalid upload mode {options.Mode.ToString()}");
         }
     }
 
-    private async Task UploadFolderAsync(string folderPath, SinkType sink, bool beatLogging)
+    private async Task UploadFolderAsync(string folderPath, SinkType sink, bool beatLogging, string? category)
     {
         var files = Directory.GetFiles(folderPath, "*.md", SearchOption.AllDirectories);
 
@@ -54,7 +54,7 @@ public class FileUploader
             var text = await File.ReadAllTextAsync(filePath);
             var fileName = Path.GetFileName(filePath);
 
-            var result = await RouteToSinkAsync(text, fileName, sink, beatLogging);
+            var result = await RouteToSinkAsync(text, fileName, sink, beatLogging, category);
 
             Console.WriteLine(FormatResult(result, sink));
             totalCount += result.Count;
@@ -63,7 +63,7 @@ public class FileUploader
         Console.WriteLine($"\nCompleted! Total items uploaded: {totalCount}");
     }
 
-    private async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, CancellationToken cancellationToken)
+    private async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, string? category, CancellationToken cancellationToken)
     {
         var lines = new ConcurrentQueue<string>();
         var dataAvailable = new SemaphoreSlim(0);
@@ -142,7 +142,7 @@ public class FileUploader
                 {
                     var content = buffer.ToString();
                     buffer.Clear();
-                    var result = await RouteToSinkAsync(content, sourceDocument, sink, beatLogging);
+                    var result = await RouteToSinkAsync(content, sourceDocument, sink, beatLogging, category);
                     Console.WriteLine(FormatResult(result, sink));
                 }
             }
@@ -150,7 +150,7 @@ public class FileUploader
         catch (OperationCanceledException) { }
     }
 
-    private async Task<UploadResult> RouteToSinkAsync(string content, string sourceDocument, SinkType sink, bool beatLogging)
+    private async Task<UploadResult> RouteToSinkAsync(string content, string sourceDocument, SinkType sink, bool beatLogging, string? category)
     {
         string? beatNumber = null;
         if (beatLogging)
@@ -165,7 +165,7 @@ public class FileUploader
         }
         else if (sink == SinkType.Document)
         {
-            await dbInterface.StoreDocument(content, sourceDocument, beatNumber);
+            await dbInterface.StoreDocument(content, sourceDocument, beatNumber, category: category);
             return new UploadResult(1, [], beatNumber);
         }
         throw new ArgumentException("Invalid sink type.", nameof(sink));

@@ -4,7 +4,7 @@ public enum SinkType { None, Embedded, Document }
 
 public enum UploadMode { None, Folder, Continuous }
 
-public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, string? SourceDocument, bool BeatLogging = false) : IConsoleAccessOptions
+public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, string? SourceDocument, bool BeatLogging = false, string? Category = null) : IConsoleAccessOptions
 {
     public static UploadOptions? Parse(string[] args)
     {
@@ -13,6 +13,7 @@ public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, 
         string? folderPath = null;
         string? sourceDocument = null;
         bool beatLogging = false;
+        string? category = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -42,6 +43,11 @@ public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, 
                 case "-b":
                     beatLogging = true;
                     break;
+                case "--category":
+                case "-cat":
+                    if (i + 1 >= args.Length) { PrintUsage(); return null; }
+                    category = args[++i];
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {args[i]}");
                     PrintUsage();
@@ -55,14 +61,31 @@ public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, 
             return null;
         }
 
-        if (beatLogging && sink != SinkType.Document)
+        if (sink != SinkType.Document)
         {
-            Console.Error.WriteLine("Error: --beatLogging can only be used with --document sink.");
-            PrintUsage();
-            return null;
+            if (!ValidateNonDocumentOptions(beatLogging, category))
+            {
+                PrintUsage();
+                return null;
+            }
         }
 
-        return new UploadOptions(mode.Value, sink, folderPath, sourceDocument, beatLogging);
+        return new UploadOptions(mode.Value, sink, folderPath, sourceDocument, beatLogging, category);
+    }
+
+    private static bool ValidateNonDocumentOptions(bool beatLogging, string? category)
+    {
+        if (beatLogging)
+        {
+            Console.Error.WriteLine("Error: --beatLogging can only be used with --document sink.");
+            return false;
+        }
+        if (category != null)
+        {
+            Console.Error.WriteLine("Error: --category can only be used with --document sink.");
+            return false;
+        }
+        return true;
     }
 
     public static void PrintUsage()
@@ -75,5 +98,6 @@ public record UploadOptions(UploadMode Mode, SinkType Sink, string? FolderPath, 
         Console.WriteLine("  -b, --beatLogging                  Pre-process document through BeatPreprocessor");
         Console.WriteLine("  -e, --embedded                     Write to embeddings (default)");
         Console.WriteLine("  -d, --document                     Write to documents table");
+        Console.WriteLine("  -cat, --category <category>        Category label to attach to stored documents (document sink only)");
     }
 }
