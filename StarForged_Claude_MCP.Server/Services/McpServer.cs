@@ -151,7 +151,7 @@ public class McpServer
             new()
             {
                 Name = "get_documents",
-                Description = "Retrieves all documents stored with the given sourceDocument in the order they were added.",
+                Description = "Retrieves all documents stored with the given sourceDocument in the order they were added. If you found this sourceDocument via a category-filtered document_index call, pass the same category here.",
                 InputSchema = new
                 {
                     type = "object",
@@ -180,7 +180,7 @@ public class McpServer
             new()
             {
                 Name = "document_index",
-                Description = "Returns the distinct sourceDocuments stored in the document store.",
+                Description = "Returns the distinct sourceDocuments stored in the document store. If you filter by category here, pass the same category to get_documents when retrieving documents from those sourceDocuments.",
                 InputSchema = new
                 {
                     type = "object",
