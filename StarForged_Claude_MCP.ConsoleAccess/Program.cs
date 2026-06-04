@@ -94,8 +94,8 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --folder <path> [--embedded | --document]");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --continuous <sourceDocument> [--embedded | --document] [--beatLogging]");
+        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --folder <path> [--embedded | --document] [--category <category>]");
+        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --continuous <sourceDocument> [--embedded | --document] [--beatLogging] [--category <category>]");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload download <sourceDocument>");
         Console.WriteLine("  StarForged_Claude_MCP.DirectUpload search <searchString> [-t <topK>]");
         Console.WriteLine();

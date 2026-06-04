@@ -65,6 +65,8 @@ public class FileUploader
 
     private async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, string? category, CancellationToken cancellationToken)
     {
+        const string UndoSentinel = "\x1A";
+
         var lines = new ConcurrentQueue<string>();
         var dataAvailable = new SemaphoreSlim(0);
 
@@ -93,6 +95,11 @@ public class FileUploader
                             lineBuilder.Clear();
                             dataAvailable.Release();
                         }
+                        else if (key.Key == ConsoleKey.Z && (key.Modifiers & ConsoleModifiers.Control) != 0)
+                        {
+                            lines.Enqueue(UndoSentinel);
+                            dataAvailable.Release();
+                        }
                         else if (key.KeyChar != '\0')
                         {
                             lineBuilder.Append(key.KeyChar);
@@ -117,6 +124,8 @@ public class FileUploader
 
         Console.WriteLine($"Listening on stdin. Source: {sourceDocument}. Press Ctrl+C to exit.");
 
+        var undoStack = new Stack<int>();
+
         if (beatLogging)
         {
             var beats = await dbInterface.GetBeats(sourceDocument);
@@ -136,18 +145,44 @@ public class FileUploader
                 if (gotSignal)
                 {
                     while (lines.TryDequeue(out var line))
-                        buffer.AppendLine(line);
+                    {
+                        if (line == UndoSentinel)
+                            await HandleUndoAsync(undoStack, sourceDocument, beatLogging);
+                        else
+                            buffer.AppendLine(line);
+                    }
                 }
                 else if (buffer.Length > 0)
                 {
                     var content = buffer.ToString();
                     buffer.Clear();
                     var result = await RouteToSinkAsync(content, sourceDocument, sink, beatLogging, category);
+                    if (result.DocumentId.HasValue)
+                        undoStack.Push(result.DocumentId.Value);
                     Console.WriteLine(FormatResult(result, sink));
                 }
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    private async Task HandleUndoAsync(Stack<int> undoStack, string sourceDocument, bool beatLogging)
+    {
+        if (undoStack.Count == 0)
+        {
+            Console.WriteLine("  Nothing to undo.");
+            return;
+        }
+        var id = undoStack.Pop();
+        await dbInterface.DeleteDocumentById(id);
+        Console.WriteLine("  Undone: removed last logged document.");
+
+        if (beatLogging)
+        {
+            var beats = await dbInterface.GetBeats(sourceDocument);
+            var beatDisplay = string.Join(", ", beats.Select(b => b ?? "None"));
+            Console.WriteLine($"Currently logged beats: [{beatDisplay}]");
+        }
     }
 
     private async Task<UploadResult> RouteToSinkAsync(string content, string sourceDocument, SinkType sink, bool beatLogging, string? category)
@@ -165,8 +200,8 @@ public class FileUploader
         }
         else if (sink == SinkType.Document)
         {
-            await dbInterface.StoreDocument(content, sourceDocument, beatNumber, category: category);
-            return new UploadResult(1, [], beatNumber);
+            var id = await dbInterface.StoreDocument(content, sourceDocument, beatNumber, category: category);
+            return new UploadResult(1, [], beatNumber, id);
         }
         throw new ArgumentException("Invalid sink type.", nameof(sink));
     }
@@ -178,5 +213,5 @@ public class FileUploader
         _ => "  Stored document."
     };
 
-    private record UploadResult(int Count, int[] Ids, string? BeatNumber = null);
+    private record UploadResult(int Count, int[] Ids, string? BeatNumber = null, int? DocumentId = null);
 }

@@ -54,12 +54,18 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Documents");
     }
 
-    public async Task StoreDocument(string content, string sourceDocument, string? beatNumber = null, string? summary = null, string? category = null)
+    public async Task<int> StoreDocument(string content, string sourceDocument, string? beatNumber = null, string? summary = null, string? category = null)
     {
         using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync(
-            "insert into Documents (Content, SourceDocument, BeatNumber, Summary, Category) values (@Content, @SourceDocument, @BeatNumber, @Summary, @Category)",
+        return await connection.QuerySingleAsync<int>(
+            "insert into Documents (Content, SourceDocument, BeatNumber, Summary, Category) output inserted.Id values (@Content, @SourceDocument, @BeatNumber, @Summary, @Category)",
             new { Content = content, SourceDocument = sourceDocument, BeatNumber = beatNumber, Summary = summary, Category = category });
+    }
+
+    public async Task DeleteDocumentById(int id)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Documents where Id = @Id", new { Id = id });
     }
 
     public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument, string? category = null)
