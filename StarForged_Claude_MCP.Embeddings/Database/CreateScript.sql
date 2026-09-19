@@ -10,7 +10,6 @@ create table Documents
     Filename nvarchar(500) not null,
     Content nvarchar(max) not null,
     Summary nvarchar(512) null,
-    Indexed bit not null,
     constraint UQ_Documents_Category_Filename unique (Category, Filename)
 );
 

@@ -8,11 +8,6 @@ using StarForged_Claude_MCP.Tests.Server.Integration;
 
 namespace StarForged_Claude_MCP.Tests.ConsoleAccess;
 
-/// <summary>
-/// Folder uploads replace what is already stored: the files on disk are the source of truth,
-/// so a second run over the same folder is a refresh rather than a set of conflicts. Files
-/// carry no summary of their own, which is what the summary modes are for.
-/// </summary>
 public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 {
     private const string Category = "console_upload";
@@ -43,7 +38,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "A stored summary", indexed: false);
+        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "A stored summary");
         folder.Write("notes.md", Markdown("Notes", "Entirely new content."));
 
         var prompt = await Upload(folder, SummaryMode.None);
@@ -58,7 +53,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "A stored summary", indexed: false);
+        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "A stored summary");
         folder.Write("notes.md", Markdown("Notes", "Entirely new content."));
 
         var prompt = await Upload(folder, SummaryMode.Drop);
@@ -73,8 +68,8 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "has_one.md", "Older content.", summary: "Already summarised", indexed: false);
-        await Db.StoreDocument(Category, "has_none.md", "Older content.", summary: null, indexed: false);
+        await Db.StoreDocument(Category, "has_one.md", "Older content.", summary: "Already summarised");
+        await Db.StoreDocument(Category, "has_none.md", "Older content.", summary: null);
 
         folder.Write("has_one.md", Markdown("One", "Replacement content."));
         folder.Write("has_none.md", Markdown("None", "Replacement content."));
@@ -100,7 +95,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "The stored summary", indexed: false);
+        await Db.StoreDocument(Category, "notes.md", "Older content.", summary: "The stored summary");
         folder.Write("notes.md", Markdown("Notes", "Replacement content."));
 
         var prompt = await Upload(folder, SummaryMode.All, answers: new() { ["notes.md"] = "A freshly typed summary" });
@@ -186,7 +181,6 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             Asked.Add(filename);
             Offered.Add(existingSummary);
 
-            // No answer stands for pressing enter, which keeps whatever is already there.
             return answers.TryGetValue(filename, out var answer) ? answer : existingSummary;
         }
     }

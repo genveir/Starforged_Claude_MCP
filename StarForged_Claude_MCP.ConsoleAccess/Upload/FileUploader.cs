@@ -118,7 +118,7 @@ public class FileUploader
 
     private async Task<int> StoreDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
     {
-        var id = await dbInterface.StoreDocument(category, filename, content, summary, indexed);
+        var id = await dbInterface.StoreDocument(category, filename, content, summary);
 
         if (indexed)
         {
@@ -128,10 +128,9 @@ public class FileUploader
         return id;
     }
 
-    /// <summary>Replaces a document already in the category, content and all.</summary>
     private async Task ReplaceDocumentAsync(Document existing, string content, string? summary, bool indexed)
     {
-        await dbInterface.UpdateDocument(existing.Id, content, summary, indexed);
+        await dbInterface.UpdateDocument(existing.Id, content, summary);
 
         if (indexed)
         {
@@ -150,12 +149,6 @@ public class FileUploader
         return $"Currently logged beats: [{display}]";
     }
 
-    /// <summary>
-    /// Reads pasted text from stdin, flushing whatever arrived once it has been quiet for 100ms,
-    /// and hands each flush to <paramref name="store"/>. Ctrl+Z rolls back the last stored item
-    /// through <paramref name="undo"/>. This is the route beats are written by: it costs the GM
-    /// nothing in context, because the text is copied out of a response that was already there.
-    /// </summary>
     private static async Task RunStdinLoopAsync(
         Func<string, Task<(int Id, string Message)>> store,
         Func<int, Task<string>> undo,

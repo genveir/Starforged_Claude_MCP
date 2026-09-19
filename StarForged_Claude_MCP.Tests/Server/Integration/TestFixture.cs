@@ -31,8 +31,6 @@ public class TestFixture : IAsyncLifetime
             InitialCatalog = "master"
         }.ConnectionString;
 
-        // A run that aborts before DisposeAsync leaves the test database behind; dropping
-        // first guarantees the schema below is what the tests actually run against.
         await DropDatabase();
         await CreateDatabase(masterConnectionString, _databaseName);
         await CreateTable(_connectionString);

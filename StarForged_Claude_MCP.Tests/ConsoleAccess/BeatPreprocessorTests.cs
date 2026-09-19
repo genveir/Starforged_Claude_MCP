@@ -3,10 +3,6 @@ using StarForged_Claude_MCP.ConsoleAccess.Upload;
 
 namespace StarForged_Claude_MCP.Tests.ConsoleAccess;
 
-/// <summary>
-/// The paste route is how beats are actually written, so what this pulls out of a GM response
-/// decides how the session reads back.
-/// </summary>
 public class BeatPreprocessorTests
 {
     private readonly BeatPreprocessor _preprocessor = new();

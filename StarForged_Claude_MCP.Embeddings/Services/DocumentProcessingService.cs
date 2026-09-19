@@ -36,11 +36,6 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             this.dbInterface = dbInterface;
         }
 
-        /// <summary>
-        /// Replaces whatever is indexed for a document with chunks of the text given. Chunks are
-        /// owned by their document, so re-indexing is a delete and a rewrite; there is no dedup,
-        /// and duplicate text across documents simply produces duplicate chunks.
-        /// </summary>
         public async Task<int[]> IndexDocumentAsync(string documentText, int documentId, DocumentProcessorToUse processorToUse)
         {
             var preprocessedText = processorToUse switch

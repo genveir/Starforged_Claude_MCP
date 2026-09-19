@@ -28,7 +28,6 @@ public abstract class McpServerTestBase
     protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>
         await McpServerInvoker.HandleRequestAsync(_server, request);
 
-    /// <summary>Deleting the documents takes their embedded chunks with them, by cascade.</summary>
     protected async Task ClearTestDocuments() => await Db.DeleteAllDocuments();
 
     protected async Task ClearTestBeats() => await Db.DeleteAllBeats();
@@ -41,7 +40,6 @@ public abstract class McpServerTestBase
             Params = new CallToolParams { Name = name, Arguments = arguments }
         });
 
-    /// <summary>The JSON a successful tool call produced, unwrapped from its content envelope.</summary>
     protected JsonElement ToolPayload(JsonRpcResponse response)
     {
         var result = JsonSerializer.Deserialize<CallToolResult>(

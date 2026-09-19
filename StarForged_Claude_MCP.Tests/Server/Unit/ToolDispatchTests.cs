@@ -8,11 +8,6 @@ using StarForged_Claude_MCP.Server.Services;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
 
-/// <summary>
-/// Guards the seam between the tool names advertised by tools/list and the names
-/// ExecuteToolAsync dispatches on. A tool can only be advertised if a call to it
-/// under its advertised name reaches the facade method it is supposed to reach.
-/// </summary>
 public class ToolDispatchTests
 {
     private sealed record ToolCase(

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
@@ -24,12 +24,7 @@ public class Program
 
         builder.Configuration.AddJsonFile("appsettings.json", optional: false);
 
-        builder.Services.AddSingleton<FileUploader>();
-        builder.Services.AddSingleton<FileDownloader>();
-        builder.Services.AddSingleton<CategoryExporter>();
-        builder.Services.AddSingleton<Searcher>();
-        builder.Services.AddSingleton<BeatPreprocessor>();
-        builder.Services.AddEmbeddingsServices();
+        ConfigureServices(builder.Services);
 
         var host = builder.Build();
 
@@ -73,6 +68,17 @@ public class Program
         await host.StopAsync();
     }
 
+    internal static void ConfigureServices(IServiceCollection services)
+    {
+        services.AddSingleton<FileUploader>();
+        services.AddSingleton<FileDownloader>();
+        services.AddSingleton<CategoryExporter>();
+        services.AddSingleton<Searcher>();
+        services.AddSingleton<BeatPreprocessor>();
+        services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
+        services.AddEmbeddingsServices();
+    }
+
     private static IConsoleAccessOptions? ParseOptions(string[] args)
     {
         if (args.Length == 0)
@@ -101,7 +107,7 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index] [--keep-summaries]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index] [--summaries <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <filename>");
         Console.WriteLine("  .\\ConsoleAccess.exe export <category> --output <folder> [--overwrite]");

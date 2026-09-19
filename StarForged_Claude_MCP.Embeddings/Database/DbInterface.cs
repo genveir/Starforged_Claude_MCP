@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
@@ -18,32 +18,36 @@ public class DbInterface
 
     // ---------- Documents ----------
 
-    public async Task<int> StoreDocument(string category, string filename, string content, string? summary, bool indexed)
+    private const string IndexedColumn =
+        "cast(case when exists (select 1 from Embeddings e where e.DocumentId = d.Id) then 1 else 0 end as bit) as Indexed";
+
+    public async Task<int> StoreDocument(string category, string filename, string content, string? summary)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleAsync<int>(
             """
-            insert into Documents (Category, Filename, Content, Summary, Indexed)
+            insert into Documents (Category, Filename, Content, Summary)
             output inserted.Id
-            values (@Category, @Filename, @Content, @Summary, @Indexed)
+            values (@Category, @Filename, @Content, @Summary)
             """,
-            new { Category = category, Filename = filename, Content = content, Summary = summary, Indexed = indexed });
+            new { Category = category, Filename = filename, Content = content, Summary = summary });
     }
 
     public async Task<Document?> GetDocument(string category, string filename)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleOrDefaultAsync<Document>(
-            "select Id, Category, Filename, Content, Summary, Indexed from Documents where Category = @Category and Filename = @Filename",
+            $"select d.Id, d.Category, d.Filename, d.Content, d.Summary, {IndexedColumn} " +
+            "from Documents d where d.Category = @Category and d.Filename = @Filename",
             new { Category = category, Filename = filename });
     }
 
-    /// <summary>The document's listing entry without its content, or null if it does not exist.</summary>
     public async Task<DocumentIndexEntry?> GetDocumentSummary(string category, string filename)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleOrDefaultAsync<DocumentIndexEntry>(
-            "select Filename, Summary, Indexed from Documents where Category = @Category and Filename = @Filename",
+            $"select d.Filename, d.Summary, {IndexedColumn} " +
+            "from Documents d where d.Category = @Category and d.Filename = @Filename",
             new { Category = category, Filename = filename });
     }
 
@@ -51,20 +55,20 @@ public class DbInterface
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<DocumentIndexEntry>(
-            "select Filename, Summary, Indexed from Documents where Category = @Category order by Filename",
+            $"select d.Filename, d.Summary, {IndexedColumn} " +
+            "from Documents d where d.Category = @Category order by d.Filename",
             new { Category = category });
         return results.ToList();
     }
 
-    public async Task UpdateDocument(int id, string content, string? summary, bool indexed)
+    public async Task UpdateDocument(int id, string content, string? summary)
     {
         using var connection = new SqlConnection(_connectionString);
         await connection.ExecuteAsync(
-            "update Documents set Content = @Content, Summary = @Summary, Indexed = @Indexed where Id = @Id",
-            new { Id = id, Content = content, Summary = summary, Indexed = indexed });
+            "update Documents set Content = @Content, Summary = @Summary where Id = @Id",
+            new { Id = id, Content = content, Summary = summary });
     }
 
-    /// <summary>Deletes the document and, by cascade, any chunks embedded from it.</summary>
     public async Task DeleteDocument(int id)
     {
         using var connection = new SqlConnection(_connectionString);
@@ -113,10 +117,6 @@ public class DbInterface
         return results.ToList();
     }
 
-    /// <summary>
-    /// Every vector in a category. There is no cache: a category holds few enough rows that
-    /// reading them once per search costs nothing, and nothing can then go stale.
-    /// </summary>
     internal async Task<List<VectorResult>> GetVectorsForCategory(string category)
     {
         using var connection = new SqlConnection(_connectionString);
@@ -156,10 +156,6 @@ public class DbInterface
             new { Category = category, SessionNumber = sessionNumber, BeatNumber = beatNumber, Version = version, Content = content });
     }
 
-    /// <summary>
-    /// Every beat written for a session, in write order, superseded versions included.
-    /// Which of those are canonical is decided in code, not here.
-    /// </summary>
     public async Task<List<Beat>> GetBeatsForSession(string category, int sessionNumber)
     {
         using var connection = new SqlConnection(_connectionString);
@@ -189,7 +185,7 @@ public class DbInterface
     public async Task TestConnection()
     {
         using var connection = new SqlConnection(_connectionString);
-        await connection.QueryAsync<dynamic>("select top 0 Id, Category, Filename, Content, Summary, Indexed from Documents");
+        await connection.QueryAsync<dynamic>("select top 0 Id, Category, Filename, Content, Summary from Documents");
         await connection.QueryAsync<dynamic>("select top 0 Id, DocumentId, Text, Vector, TokenCount from Embeddings");
         await connection.QueryAsync<dynamic>("select top 0 Id, Category, SessionNumber, BeatNumber, Version, Content from Beats");
     }

@@ -265,9 +265,7 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
     {
         await ClearTestDocuments();
 
-        // Console uploads never set a summary, so this is the common case for anything
-        // that did not come from a model.
-        await Db.StoreDocument(Category, "from_the_console.md", "Some content.", summary: null, indexed: false);
+        await Db.StoreDocument(Category, "from_the_console.md", "Some content.", summary: null);
 
         var response = await CallTool("24", "get_document_summary", new Dictionary<string, object>
         {
@@ -297,6 +295,29 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
         response.Error.Should().NotBeNull();
         response.Error.Code.Should().Be(-32602);
         response.Error.Message.Should().Contain("No document named");
+    }
+
+    [Fact]
+    public async Task Indexed_ShouldFollowWhetherAnythingIsEmbedded_RatherThanAStoredFlag()
+    {
+        await ClearTestDocuments();
+
+        await CallTool("26", "add_document", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "derived.md",
+            ["text"] = "# Section" + Environment.NewLine + Environment.NewLine + "Content worth embedding.",
+            ["indexed"] = true
+        });
+
+        var document = await Db.GetDocument(Category, "derived.md");
+        document!.Indexed.Should().BeTrue();
+
+        await Db.DeleteEmbeddingsForDocument(document.Id);
+
+        (await Db.GetDocument(Category, "derived.md"))!.Indexed.Should().BeFalse();
+        (await Db.GetDocumentSummary(Category, "derived.md"))!.Indexed.Should().BeFalse();
+        (await Db.GetDocumentIndex(Category)).Single().Indexed.Should().BeFalse();
     }
 
     [Fact]

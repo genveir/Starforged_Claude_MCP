@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
@@ -510,7 +510,6 @@ public class McpServer
     private static string RequireCategory(Dictionary<string, object> arguments) =>
         RequireString(arguments, "Category", maxLength: 200);
 
-    /// <param name="name">The argument's name, capitalised for the error message; looked up camel-cased.</param>
     private static string RequireString(Dictionary<string, object> arguments, string name, int maxLength)
     {
         var key = char.ToLowerInvariant(name[0]) + name[1..];

@@ -2,7 +2,6 @@ namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
 public enum UploadMode { None, Folder, Beats }
 
-/// <summary>What a folder upload does about summaries, which files on disk do not carry.</summary>
 public enum SummaryMode
 {
     /// <summary>Ask for every file, offering the stored summary to keep.</summary>

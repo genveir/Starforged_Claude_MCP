@@ -19,7 +19,7 @@ public class DocumentsFacade : IDocumentsFacade
     {
         if (await _dbInterface.GetDocument(category, filename) != null) return false;
 
-        var id = await _dbInterface.StoreDocument(category, filename, content, summary, indexed);
+        var id = await _dbInterface.StoreDocument(category, filename, content, summary);
 
         if (indexed)
         {
@@ -34,9 +34,8 @@ public class DocumentsFacade : IDocumentsFacade
         var existing = await _dbInterface.GetDocument(category, filename);
         if (existing == null) return false;
 
-        await _dbInterface.UpdateDocument(existing.Id, content, summary, indexed);
+        await _dbInterface.UpdateDocument(existing.Id, content, summary);
 
-        // An update replaces the content outright, so whatever was indexed for it is stale either way.
         if (indexed)
         {
             await _documentProcessing.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
@@ -54,7 +53,6 @@ public class DocumentsFacade : IDocumentsFacade
         var existing = await _dbInterface.GetDocument(category, filename);
         if (existing == null) return false;
 
-        // Chunks go with it: the foreign key cascades.
         await _dbInterface.DeleteDocument(existing.Id);
         return true;
     }

@@ -15,7 +15,6 @@ public static class CanonicalBeats
 {
     private record BeatVersions(Beat Anchor, Beat Canonical);
 
-    /// <param name="beatsInWriteOrder">Every beat written for one session, oldest first.</param>
     public static List<Beat> Select(IEnumerable<Beat> beatsInWriteOrder)
     {
         var beats = beatsInWriteOrder.ToList();
@@ -41,7 +40,6 @@ public static class CanonicalBeats
 
             var versions = versionsByBeatNumber[beat.BeatNumber.Value];
 
-            // Each numbered beat is emitted once, where its earliest version sits.
             if (beat.Id != versions.Anchor.Id) continue;
 
             canonical.Add(versions.Canonical);

@@ -2,10 +2,6 @@ using System.Text.RegularExpressions;
 
 namespace StarForged_Claude_MCP.Embeddings.Database;
 
-/// <summary>
-/// Exposes CreateScript.sql, the single source of truth for the database schema,
-/// so callers do not restate the schema alongside it.
-/// </summary>
 public static class DatabaseSchema
 {
     private const string ResourceName = "StarForged_Claude_MCP.Embeddings.Database.CreateScript.sql";
@@ -24,12 +20,6 @@ public static class DatabaseSchema
         return reader.ReadToEnd();
     }
 
-    /// <summary>
-    /// The batches of the create script that build the tables, with the batches that create
-    /// and select the database itself removed. Lets a caller apply the schema to a database
-    /// of its own naming — an integration test database, for instance — while still taking
-    /// the table definitions from the script.
-    /// </summary>
     public static IReadOnlyList<string> GetTableCreationBatches() =>
         BatchSeparator.Split(ReadCreateScript())
             .Select(batch => batch.Trim())
