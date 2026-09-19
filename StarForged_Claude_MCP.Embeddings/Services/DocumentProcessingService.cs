@@ -12,7 +12,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 
     public interface IDocumentProcessingService
     {
-        Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, DocumentProcessorToUse processorToUse);
+        Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, string category, DocumentProcessorToUse processorToUse);
     }
 
     internal class DocumentProcessingService : IDocumentProcessingService
@@ -37,7 +37,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             this.vectorCache = vectorCache;
         }
 
-        public async Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, DocumentProcessorToUse processorToUse)
+        public async Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, string category, DocumentProcessorToUse processorToUse)
         {
             var preprocessedText = processorToUse switch
             {
@@ -52,15 +52,15 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             {
                 var embedding = embeddingsService.GenerateEmbeddings(chunk);
 
-                var existingId = await vectorCache.FindExistingVector(embedding);
+                var existingId = await vectorCache.FindExistingVector(embedding, category);
                 if (existingId.HasValue)
                 {
                     storedChunkIds.Add(existingId.Value);
                     continue;
                 }
 
-                var storedChunkId = await dbInterface.WriteEmbedding(chunk, embedding, sourceDocument);
-                await vectorCache.AddVector(storedChunkId, embedding);
+                var storedChunkId = await dbInterface.WriteEmbedding(chunk, embedding, sourceDocument, category);
+                await vectorCache.AddVector(storedChunkId, embedding, category);
                 storedChunkIds.Add(storedChunkId);
             }
 

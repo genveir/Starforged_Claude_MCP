@@ -13,7 +13,7 @@ public class FileDownloader
 
     public async Task DownloadFile(DownloadOptions options)
     {
-        var documents = await dbInterface.GetAllDocumentsForSourceDocument(options.SourceDocument);
+        var documents = await dbInterface.GetAllDocumentsForSourceDocument(options.SourceDocument, options.Category);
 
         foreach (var document in documents)
         {

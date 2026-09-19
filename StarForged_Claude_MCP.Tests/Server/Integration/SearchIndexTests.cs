@@ -24,6 +24,7 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "magic spells" },
+                    { "category", "lore" },
                     { "topK", 2 }
                 }
             }
@@ -88,6 +89,7 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "ocean wildlife and sea creatures" },
+                    { "category", "lore" },
                     { "topK", 2 }
                 }
             }
@@ -121,7 +123,46 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
         results.Should().Contain("Dolphins are highly intelligent marine mammals that live in the ocean.");
     }
 
-    private async Task AddTestMemory(string text, string sourceDocument)
+    [Fact]
+    public async Task Search_ShouldOnlyConsiderTheRequestedCategory()
+    {
+        await ClearTestMemories();
+
+        await AddTestMemory("The ancient dragon guarded its hoard deep beneath the mountain.", "test_scoping", category: "session_log");
+
+        var makeRequest = (string id, string category) => new JsonRpcRequest
+        {
+            Id = id,
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "search_index",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "query", "sleeping dragon" },
+                    { "category", category },
+                    { "topK", 5 }
+                }
+            }
+        };
+
+        JsonElement[] ResultsOf(JsonRpcResponse response)
+        {
+            response.Error.Should().BeNull();
+            var result = JsonSerializer.Deserialize<CallToolResult>(
+                JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
+            return JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions)
+                .GetProperty("results").EnumerateArray().ToArray();
+        }
+
+        var otherCategory = ResultsOf(await InvokeServerMethod(makeRequest("20", "lore")));
+        var ownCategory = ResultsOf(await InvokeServerMethod(makeRequest("21", "session_log")));
+
+        otherCategory.Should().BeEmpty(because: "the only matching chunk was stored under a different category");
+        ownCategory.Should().HaveCount(1);
+    }
+
+    private async Task AddTestMemory(string text, string sourceDocument, string category = "lore")
     {
         var request = new JsonRpcRequest
         {
@@ -132,7 +173,8 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", text },
-                    { "sourceDocument", sourceDocument }
+                    { "sourceDocument", sourceDocument },
+                    { "category", category }
                 }
             }
         };
@@ -158,6 +200,7 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "sleeping dragon" },
+                    { "category", "lore" },
                     { "topK", 1 }
                 }
             }
@@ -192,6 +235,7 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "dragon guarding hoard" },
+                    { "category", "lore" },
                     { "topK", 1 }
                 }
             }
@@ -226,6 +270,7 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "dragon lair hoard" },
+                    { "category", "lore" },
                     { "topK", 1 }
                 }
             }

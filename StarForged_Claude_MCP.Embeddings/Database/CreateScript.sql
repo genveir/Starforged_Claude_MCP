@@ -9,7 +9,8 @@ create table Embeddings
     Text nvarchar(max) not null,
     Vector varbinary(8000) not null,
     SourceDocument nvarchar(500) not null,
-    TokenCount int not null
+    TokenCount int not null,
+    Category nvarchar(200) not null
 );
 
 create table Documents
@@ -19,5 +20,5 @@ create table Documents
     Content nvarchar(max) not null,
     BeatNumber nvarchar(20) null,
     Summary nvarchar(512) null,
-    Category nvarchar(200) null
+    Category nvarchar(200) not null
 );

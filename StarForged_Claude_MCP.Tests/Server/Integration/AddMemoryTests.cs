@@ -24,7 +24,8 @@ public class AddMemoryTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", "The ancient dragon sleeps in the mountain." },
-                    { "sourceDocument", "test_campaign" }
+                    { "sourceDocument", "test_campaign" },
+                    { "category", "lore" }
                 }
             }
         };
@@ -65,7 +66,8 @@ public class AddMemoryTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", "The ancient dragon sleeps in the mountain." },
-                    { "sourceDocument", "test_dedup" }
+                    { "sourceDocument", "test_dedup" },
+                    { "category", "lore" }
                 }
             }
         };
@@ -93,6 +95,50 @@ public class AddMemoryTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task AddMemory_WithSameTextInAnotherCategory_ShouldStoreSeparately()
+    {
+        await ClearTestMemories();
+
+        var makeRequest = (string id, string category) => new JsonRpcRequest
+        {
+            Id = id,
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "add_memory",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "text", "The ancient dragon sleeps in the mountain." },
+                    { "sourceDocument", "test_category_dedup" },
+                    { "category", category }
+                }
+            }
+        };
+
+        int[] ParseIds(JsonRpcResponse response)
+        {
+            var result = JsonSerializer.Deserialize<CallToolResult>(
+                JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
+            return JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions)
+                .GetProperty("id").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+        }
+
+        var loreIds = ParseIds(await InvokeServerMethod(makeRequest("12", "lore")));
+        var sessionIds = ParseIds(await InvokeServerMethod(makeRequest("13", "session_log")));
+
+        loreIds.Should().NotBeEmpty();
+        sessionIds.Should().NotIntersectWith(loreIds,
+            because: "dedup is scoped to a category, so the same text stored under another category is a new chunk");
+
+        var connectionString = _fixture.Services.GetRequiredService<IConfiguration>()
+            .GetConnectionString("DefaultConnection")!;
+        await using var connection = new SqlConnection(connectionString);
+        var categories = await connection.QueryAsync<string>(
+            "select distinct Category from Embeddings where SourceDocument = 'test_category_dedup'");
+        categories.Should().BeEquivalentTo(["lore", "session_log"]);
+    }
+
+    [Fact]
     public async Task AddMemory_WithEmptyText_ShouldReturnError()
     {
         var request = new JsonRpcRequest
@@ -105,7 +151,8 @@ public class AddMemoryTests(TestFixture fixture) : McpServerTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", "" },
-                    { "sourceDocument", "test" }
+                    { "sourceDocument", "test" },
+                    { "category", "lore" }
                 }
             }
         };

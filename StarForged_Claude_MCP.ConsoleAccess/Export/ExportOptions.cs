@@ -4,39 +4,32 @@ public record ExportOptions(string Category, string OutputFolder, bool Overwrite
 {
     public static ExportOptions? Parse(string[] args)
     {
-        string? category = null;
+        if (!CategoryArgument.TryTake(args, out var category, out var rest))
+        {
+            PrintUsage();
+            return null;
+        }
+
         string? outputFolder = null;
         bool overwrite = false;
 
-        for (int i = 0; i < args.Length; i++)
+        for (int i = 0; i < rest.Length; i++)
         {
-            switch (args[i])
+            switch (rest[i])
             {
-                case "--category":
-                case "-cat":
-                    if (i + 1 >= args.Length) { PrintUsage(); return null; }
-                    category = args[++i];
-                    break;
                 case "--output":
                 case "-o":
-                    if (i + 1 >= args.Length) { PrintUsage(); return null; }
-                    outputFolder = args[++i];
+                    if (i + 1 >= rest.Length) { PrintUsage(); return null; }
+                    outputFolder = rest[++i];
                     break;
                 case "--overwrite":
                     overwrite = true;
                     break;
                 default:
-                    Console.Error.WriteLine($"Unknown argument: {args[i]}");
+                    Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
                     return null;
             }
-        }
-
-        if (string.IsNullOrWhiteSpace(category))
-        {
-            Console.Error.WriteLine("Error: --category is required.");
-            PrintUsage();
-            return null;
         }
 
         if (string.IsNullOrWhiteSpace(outputFolder))
@@ -54,7 +47,7 @@ public record ExportOptions(string Category, string OutputFolder, bool Overwrite
         Program.PrintUsage();
 
         Console.WriteLine("Export Options:");
-        Console.WriteLine("  -cat, --category <category>  The category to export (required)");
+        Console.WriteLine("  <category>                   The category to export (required)");
         Console.WriteLine("  -o, --output <path>          Folder to write the .md files to (created if missing)");
         Console.WriteLine("      --overwrite              Replace existing files instead of skipping them");
     }

@@ -14,7 +14,7 @@ public class Searcher
 
     public async Task Search(SearchOptions options)
     {
-        var results = await searchService.Search(options.SearchString, options.TopK);
+        var results = await searchService.Search(options.SearchString, options.Category, options.TopK);
 
         foreach (var result in results)
         {

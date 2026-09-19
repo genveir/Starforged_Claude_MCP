@@ -54,6 +54,7 @@ public class RetrieveSearchResultsTests(TestFixture fixture) : McpServerTestBase
                 Arguments = new Dictionary<string, object>
                 {
                     { "query", "dragon guarding hoard" },
+                    { "category", "lore" },
                     { "topK", 1 }
                 }
             }
@@ -180,7 +181,8 @@ public class RetrieveSearchResultsTests(TestFixture fixture) : McpServerTestBase
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", text },
-                    { "sourceDocument", sourceDocument }
+                    { "sourceDocument", sourceDocument },
+                    { "category", "lore" }
                 }
             }
         };

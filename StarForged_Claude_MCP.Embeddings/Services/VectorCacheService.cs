@@ -7,7 +7,15 @@ namespace StarForged_Claude_MCP.Embeddings.Services;
 internal class VectorCacheService : IHostedService
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private Dictionary<int, float[]> _vectorCache = new();
+
+    /// <summary>
+    /// Vectors by id, held in a separate cache per category. Every read is scoped to one
+    /// category: there is no search across the whole database, and dedup only ever matches
+    /// within the category being written to. Categories compare case-insensitively, as they
+    /// do in SQL.
+    /// </summary>
+    private Dictionary<string, Dictionary<int, float[]>> _vectorCache = NewCache();
+
     private readonly SemaphoreSlim _cacheLock = new(1, 1);
 
     public VectorCacheService(IServiceScopeFactory scopeFactory)
@@ -35,7 +43,17 @@ internal class VectorCacheService : IHostedService
         await _cacheLock.WaitAsync();
         try
         {
-            _vectorCache = vectors.ToDictionary(v => v.Id, v => v.Vector);
+            var cache = NewCache();
+            foreach (var vector in vectors)
+            {
+                if (!cache.TryGetValue(vector.Category, out var categoryCache))
+                {
+                    categoryCache = [];
+                    cache[vector.Category] = categoryCache;
+                }
+                categoryCache[vector.Id] = vector.Vector;
+            }
+            _vectorCache = cache;
         }
         finally
         {
@@ -43,12 +61,14 @@ internal class VectorCacheService : IHostedService
         }
     }
 
-    public async Task<Dictionary<int, float[]>> GetAllVectors()
+    public async Task<Dictionary<int, float[]>> GetAllVectors(string category)
     {
         await _cacheLock.WaitAsync();
         try
         {
-            return new Dictionary<int, float[]>(_vectorCache);
+            return _vectorCache.TryGetValue(category, out var categoryCache)
+                ? new Dictionary<int, float[]>(categoryCache)
+                : [];
         }
         finally
         {
@@ -56,12 +76,17 @@ internal class VectorCacheService : IHostedService
         }
     }
 
-    public async Task AddVector(int id, float[] vector)
+    public async Task AddVector(int id, float[] vector, string category)
     {
         await _cacheLock.WaitAsync();
         try
         {
-            _vectorCache[id] = vector;
+            if (!_vectorCache.TryGetValue(category, out var categoryCache))
+            {
+                categoryCache = [];
+                _vectorCache[category] = categoryCache;
+            }
+            categoryCache[id] = vector;
         }
         finally
         {
@@ -69,12 +94,14 @@ internal class VectorCacheService : IHostedService
         }
     }
 
-    public async Task<int?> FindExistingVector(float[] vector)
+    public async Task<int?> FindExistingVector(float[] vector, string category)
     {
         await _cacheLock.WaitAsync();
         try
         {
-            foreach (var kvp in _vectorCache)
+            if (!_vectorCache.TryGetValue(category, out var categoryCache)) return null;
+
+            foreach (var kvp in categoryCache)
             {
                 if (VectorsAreEqual(kvp.Value, vector))
                 {
@@ -88,6 +115,9 @@ internal class VectorCacheService : IHostedService
             _cacheLock.Release();
         }
     }
+
+    private static Dictionary<string, Dictionary<int, float[]>> NewCache() =>
+        new(StringComparer.OrdinalIgnoreCase);
 
     private static bool VectorsAreEqual(float[] a, float[] b) => a.SequenceEqual(b);
 }

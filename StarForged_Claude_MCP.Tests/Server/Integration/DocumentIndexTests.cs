@@ -11,9 +11,9 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("Content A", "alpha");
-        await AddTestDocument("Content B", "beta");
-        await AddTestDocument("Content C", "alpha");
+        await AddTestDocument("Content A", "alpha", "session_log");
+        await AddTestDocument("Content B", "beta", "session_log");
+        await AddTestDocument("Content C", "alpha", "session_log");
 
         var request = new JsonRpcRequest
         {
@@ -22,7 +22,7 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
             Params = new CallToolParams
             {
                 Name = "document_index",
-                Arguments = new Dictionary<string, object>()
+                Arguments = new Dictionary<string, object> { { "category", "session_log" } }
             }
         };
 
@@ -56,7 +56,7 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
             Params = new CallToolParams
             {
                 Name = "document_index",
-                Arguments = new Dictionary<string, object>()
+                Arguments = new Dictionary<string, object> { { "category", "session_log" } }
             }
         };
 
@@ -81,10 +81,10 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("Content A", "alpha", category: "combat");
-        await AddTestDocument("Content B", "beta", category: "intrigue");
-        await AddTestDocument("Content C", "gamma", category: "combat");
-        await AddTestDocument("Content D", "gamma", category: "intrigue");
+        await AddTestDocument("Content A", "alpha", "combat");
+        await AddTestDocument("Content B", "beta", "intrigue");
+        await AddTestDocument("Content C", "gamma", "combat");
+        await AddTestDocument("Content D", "gamma", "intrigue");
 
         var request = new JsonRpcRequest
         {
@@ -117,11 +117,11 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("Content A", "alpha", summary: "First summary");
-        await AddTestDocument("Content B", "alpha", summary: "Second summary");
-        await AddTestDocument("Content C", "alpha", summary: "First summary");
-        await AddTestDocument("Content D", "beta", summary: "Only summary");
-        await AddTestDocument("Content E", "gamma");
+        await AddTestDocument("Content A", "alpha", "session_log", summary: "First summary");
+        await AddTestDocument("Content B", "alpha", "session_log", summary: "Second summary");
+        await AddTestDocument("Content C", "alpha", "session_log", summary: "First summary");
+        await AddTestDocument("Content D", "beta", "session_log", summary: "Only summary");
+        await AddTestDocument("Content E", "gamma", "session_log");
 
         var request = new JsonRpcRequest
         {
@@ -130,7 +130,7 @@ public class DocumentIndexTests(TestFixture fixture) : DocumentsTestBase(fixture
             Params = new CallToolParams
             {
                 Name = "document_index",
-                Arguments = new Dictionary<string, object>()
+                Arguments = new Dictionary<string, object> { { "category", "session_log" } }
             }
         };
 

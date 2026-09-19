@@ -21,7 +21,8 @@ public class AddDocumentTests(TestFixture fixture) : DocumentsTestBase(fixture)
                 Arguments = new Dictionary<string, object>
                 {
                     { "text", "The hero entered the tavern at midnight." },
-                    { "sourceDocument", "test_doc_store" }
+                    { "sourceDocument", "test_doc_store" },
+                    { "category", "session_log" }
                 }
             }
         };
@@ -41,7 +42,8 @@ public class AddDocumentTests(TestFixture fixture) : DocumentsTestBase(fixture)
                 Name = "get_documents",
                 Arguments = new Dictionary<string, object>
                 {
-                    { "sourceDocument", "test_doc_store" }
+                    { "sourceDocument", "test_doc_store" },
+                    { "category", "session_log" }
                 }
             }
         };
@@ -121,9 +123,9 @@ public class AddDocumentTests(TestFixture fixture) : DocumentsTestBase(fixture)
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("The rogue picked the lock.", "test_doc_store", category: "stealth");
-        await AddTestDocument("The paladin smote the undead.", "test_doc_store", category: "combat");
-        await AddTestDocument("The wizard cast a fireball.", "test_doc_store", category: "combat");
+        await AddTestDocument("The rogue picked the lock.", "test_doc_store", "stealth");
+        await AddTestDocument("The paladin smote the undead.", "test_doc_store", "combat");
+        await AddTestDocument("The wizard cast a fireball.", "test_doc_store", "combat");
 
         var request = new JsonRpcRequest
         {
@@ -156,17 +158,38 @@ public class AddDocumentTests(TestFixture fixture) : DocumentsTestBase(fixture)
     }
 
     [Fact]
-    public async Task GetDocuments_WithNoCategory_ShouldReturnOnlyNullCategoryDocuments()
+    public async Task AddDocument_WithoutCategory_ShouldReturnError()
     {
-        await ClearTestDocuments();
-
-        await AddTestDocument("The bard sang a ballad.", "test_doc_store");
-        await AddTestDocument("The rogue picked the lock.", "test_doc_store", category: "stealth");
-        await AddTestDocument("The cleric prayed for guidance.", "test_doc_store");
-
         var request = new JsonRpcRequest
         {
             Id = "13",
+            Method = "tools/call",
+            Params = new CallToolParams
+            {
+                Name = "add_document",
+                Arguments = new Dictionary<string, object>
+                {
+                    { "text", "The bard sang a ballad." },
+                    { "sourceDocument", "test_doc_store" }
+                }
+            }
+        };
+
+        var response = await InvokeServerMethod(request);
+
+        response.Should().NotBeNull();
+        response.Id.Should().Be("13");
+        response.Error.Should().NotBeNull();
+        response.Error.Code.Should().Be(-32602);
+        response.Error.Message.Should().Contain("Category cannot be empty");
+    }
+
+    [Fact]
+    public async Task GetDocuments_WithoutCategory_ShouldReturnError()
+    {
+        var request = new JsonRpcRequest
+        {
+            Id = "14",
             Method = "tools/call",
             Params = new CallToolParams
             {
@@ -179,17 +202,11 @@ public class AddDocumentTests(TestFixture fixture) : DocumentsTestBase(fixture)
         };
 
         var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
 
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions),
-            _jsonOptions);
-
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
-
-        documents.Should().HaveCount(2);
-        documents[0].GetProperty("content").GetString().Should().Be("The bard sang a ballad.");
-        documents[1].GetProperty("content").GetString().Should().Be("The cleric prayed for guidance.");
+        response.Should().NotBeNull();
+        response.Id.Should().Be("14");
+        response.Error.Should().NotBeNull();
+        response.Error.Code.Should().Be(-32602);
+        response.Error.Message.Should().Contain("Category cannot be empty");
     }
 }

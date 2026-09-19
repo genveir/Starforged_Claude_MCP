@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
@@ -101,11 +101,11 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --folder <path> [--embedded | --document] [--category <category>]");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload upload --continuous <sourceDocument> [--embedded | --document] [--beatLogging] [--category <category>]");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload download <sourceDocument>");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload export --category <category> --output <folder> [--overwrite]");
-        Console.WriteLine("  StarForged_Claude_MCP.DirectUpload search <searchString> [-t <topK>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--embedded | --document]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --continuous <sourceDocument> [--embedded | --document] [--beatLogging]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <sourceDocument>");
+        Console.WriteLine("  .\\ConsoleAccess.exe export <category> --output <folder> [--overwrite]");
+        Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
         Console.WriteLine();
     }
 

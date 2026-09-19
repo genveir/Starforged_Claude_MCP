@@ -193,14 +193,17 @@ public class FileUploader
             (beatNumber, content) = beatPreprocessor.Process(content);
         }
 
+        // UploadOptions rejects a run without one, so this only fires on a programming error.
+        ArgumentException.ThrowIfNullOrWhiteSpace(category);
+
         if (sink == SinkType.Embedded)
         {
-            var ids = await documentProcessingService.ProcessAndStoreDocumentAsync(content, sourceDocument, DocumentProcessorToUse.Markdown);
+            var ids = await documentProcessingService.ProcessAndStoreDocumentAsync(content, sourceDocument, category, DocumentProcessorToUse.Markdown);
             return new UploadResult(ids.Length, ids);
         }
         else if (sink == SinkType.Document)
         {
-            var id = await dbInterface.StoreDocument(content, sourceDocument, beatNumber, category: category);
+            var id = await dbInterface.StoreDocument(content, sourceDocument, category, beatNumber);
             return new UploadResult(1, [], beatNumber, id);
         }
         throw new ArgumentException("Invalid sink type.", nameof(sink));

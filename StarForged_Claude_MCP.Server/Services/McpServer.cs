@@ -1,4 +1,4 @@
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
@@ -104,16 +104,17 @@ public class McpServer
             new()
             {
                 Name = "search_index",
-                Description = "Search for relevant chunks by semantic similarity. Returns IDs, scores, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs",
+                Description = "Search for relevant chunks by semantic similarity within a single category. Returns IDs, scores, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
                         query = new { type = "string", description = "Natural language search query" },
+                        category = new { type = "string", description = "Category to search; only chunks stored under this category are considered" },
                         topK = new { type = "number", description = "Number of results to return (default: 3, max: 10)" }
                     },
-                    required = new[] { "query" }
+                    required = new[] { "query", "category" }
                 }
             },
             new()
@@ -126,9 +127,10 @@ public class McpServer
                     properties = new
                     {
                         text = new { type = "string", description = "The content to store" },
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" }
+                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
+                        category = new { type = "string", description = "Category label attached to every chunk stored from this text" }
                     },
-                    required = new[] { "text", "sourceDocument" }
+                    required = new[] { "text", "sourceDocument", "category" }
                 }
             },
             new()
@@ -305,6 +307,8 @@ public class McpServer
     private async Task<string> ExecuteSearchAsync(Dictionary<string, object> arguments)
     {
         var query = arguments["query"].ToString() ?? "";
+        var category = RequireCategory(arguments);
+
         if (string.IsNullOrWhiteSpace(query))
         {
             throw new ArgumentException("Query cannot be empty");
@@ -319,8 +323,8 @@ public class McpServer
             : 3;
         topK = Math.Min(topK, 10);
 
-        _logger.LogDebug("Executing search: query length={QueryLength}, topK={TopK}", query.Length, topK);
-        var results = await _embeddings.SearchAsync(query, topK);
+        _logger.LogDebug("Executing search: category={Category}, query length={QueryLength}, topK={TopK}", category, query.Length, topK);
+        var results = await _embeddings.SearchAsync(query, category, topK);
         _logger.LogDebug("Search returned {ResultCount} result(s)", results.Length);
         var briefResults = results.Select(r => new
         {
@@ -358,6 +362,7 @@ public class McpServer
     {
         var text = arguments["text"].ToString() ?? "";
         var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
+        var category = RequireCategory(arguments);
 
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -377,7 +382,7 @@ public class McpServer
         }
 
         _logger.LogDebug("Executing add_memory: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
-        var id = await _embeddings.AddMemoryAsync(text, sourceDocument);
+        var id = await _embeddings.AddMemoryAsync(text, sourceDocument, category);
         _logger.LogDebug("add_memory stored {ChunkCount} chunk(s) for sourceDocument={SourceDocument}", id.Length, sourceDocument);
         return JsonSerializer.Serialize(new { message = "Memory stored successfully", Id = id }, _jsonOptions);
     }
@@ -387,7 +392,7 @@ public class McpServer
         var text = arguments["text"].ToString() ?? "";
         var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
         var summary = arguments.TryGetValue("summary", out var s) ? s?.ToString() : null;
-        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+        var category = RequireCategory(arguments);
 
         if (string.IsNullOrWhiteSpace(text))
             throw new ArgumentException("Text cannot be empty");
@@ -397,11 +402,9 @@ public class McpServer
             throw new ArgumentException("SourceDocument cannot be empty");
         if (sourceDocument.Length > 500)
             throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
-        if (category?.Length > 200)
-            throw new ArgumentException("Category exceeds maximum length of 200 characters");
 
         _logger.LogDebug("Executing add_document: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
-        await _documents.StoreDocumentAsync(text, sourceDocument, summary: summary, category: category);
+        await _documents.StoreDocumentAsync(text, sourceDocument, category, summary: summary);
         _logger.LogDebug("add_document stored document for sourceDocument={SourceDocument}", sourceDocument);
         return JsonSerializer.Serialize(new { message = "Document stored successfully" }, _jsonOptions);
     }
@@ -409,7 +412,7 @@ public class McpServer
     private async Task<string> ExecuteGetDocumentsAsync(Dictionary<string, object> arguments)
     {
         var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
-        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+        var category = RequireCategory(arguments);
 
         if (string.IsNullOrWhiteSpace(sourceDocument))
             throw new ArgumentException("SourceDocument cannot be empty");
@@ -427,7 +430,7 @@ public class McpServer
         var sessionNumber = arguments["sessionNumber"] is JsonElement je
             ? je.GetInt32()
             : Convert.ToInt32(arguments["sessionNumber"]);
-        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+        var category = RequireCategory(arguments);
 
         var sourceDocument = $"SessionBeats_{sessionNumber}";
 
@@ -449,7 +452,7 @@ public class McpServer
 
     private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
     {
-        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+        var category = RequireCategory(arguments);
 
         _logger.LogDebug("Executing document_index");
         var sourceDocuments = await _documents.GetDocumentIndexAsync(category);
@@ -457,6 +460,18 @@ public class McpServer
         return JsonSerializer.Serialize(new { sourceDocuments }, _jsonOptions);
     }
 
+
+    private static string RequireCategory(Dictionary<string, object> arguments)
+    {
+        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+
+        if (string.IsNullOrWhiteSpace(category))
+            throw new ArgumentException("Category cannot be empty");
+        if (category.Length > 200)
+            throw new ArgumentException("Category exceeds maximum length of 200 characters");
+
+        return category;
+    }
 
     private static List<DocumentResult> FilterCanonicalBeats(List<DocumentResult> documents)
     {

@@ -30,9 +30,13 @@ public class ToolDispatchTests
     private static readonly Dictionary<string, ToolCase> ToolCases = new()
     {
         ["search_index"] = new ToolCase(
-            Arguments: new Dictionary<string, object> { ["query"] = "derelict in the Forge" },
+            Arguments: new Dictionary<string, object>
+            {
+                ["query"] = "derelict in the Forge",
+                ["category"] = Category
+            },
             VerifyDispatch: (embeddings, documents) =>
-                embeddings.Verify(f => f.SearchAsync("derelict in the Forge", 3), Times.Once)),
+                embeddings.Verify(f => f.SearchAsync("derelict in the Forge", Category, 3), Times.Once)),
 
         ["retrieve_search_results"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["ids"] = new object[] { 7, 11 } },
@@ -40,9 +44,14 @@ public class ToolDispatchTests
                 embeddings.Verify(f => f.RetrieveByIdsAsync(It.Is<int[]>(ids => ids.SequenceEqual(new[] { 7, 11 }))), Times.Once)),
 
         ["add_memory"] = new ToolCase(
-            Arguments: new Dictionary<string, object> { ["text"] = Text, ["sourceDocument"] = SourceDocument },
+            Arguments: new Dictionary<string, object>
+            {
+                ["text"] = Text,
+                ["sourceDocument"] = SourceDocument,
+                ["category"] = Category
+            },
             VerifyDispatch: (embeddings, documents) =>
-                embeddings.Verify(f => f.AddMemoryAsync(Text, SourceDocument), Times.Once)),
+                embeddings.Verify(f => f.AddMemoryAsync(Text, SourceDocument, Category), Times.Once)),
 
         ["add_document"] = new ToolCase(
             Arguments: new Dictionary<string, object>
@@ -53,7 +62,7 @@ public class ToolDispatchTests
                 ["category"] = Category
             },
             VerifyDispatch: (embeddings, documents) =>
-                documents.Verify(f => f.StoreDocumentAsync(Text, SourceDocument, "A short summary.", Category), Times.Once)),
+                documents.Verify(f => f.StoreDocumentAsync(Text, SourceDocument, Category, "A short summary."), Times.Once)),
 
         ["get_documents"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["sourceDocument"] = SourceDocument, ["category"] = Category },
@@ -151,9 +160,9 @@ public class ToolDispatchTests
     {
         var mock = new Mock<IEmbeddingsFacade>(MockBehavior.Strict);
 
-        mock.Setup(f => f.SearchAsync(It.IsAny<string>(), It.IsAny<int>()))
+        mock.Setup(f => f.SearchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
             .ReturnsAsync(Array.Empty<SearchResult>());
-        mock.Setup(f => f.AddMemoryAsync(It.IsAny<string>(), It.IsAny<string>()))
+        mock.Setup(f => f.AddMemoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(Array.Empty<int>());
         mock.Setup(f => f.RetrieveByIdsAsync(It.IsAny<int[]>()))
             .ReturnsAsync(Array.Empty<TextResult>());
@@ -165,11 +174,11 @@ public class ToolDispatchTests
     {
         var mock = new Mock<IDocumentsFacade>(MockBehavior.Strict);
 
-        mock.Setup(f => f.StoreDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string?>()))
+        mock.Setup(f => f.StoreDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(f => f.GetDocumentsAsync(It.IsAny<string>(), It.IsAny<string?>()))
+        mock.Setup(f => f.GetDocumentsAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(new List<DocumentResult>());
-        mock.Setup(f => f.GetDocumentIndexAsync(It.IsAny<string?>()))
+        mock.Setup(f => f.GetDocumentIndexAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<DocumentIndexEntry>());
 
         return mock;

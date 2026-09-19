@@ -12,12 +12,12 @@ public class DocumentsFacade : IDocumentsFacade
         _dbInterface = dbInterface;
     }
 
-    public async Task StoreDocumentAsync(string content, string sourceDocument, string? summary = null, string? category = null) =>
-        await _dbInterface.StoreDocument(content, sourceDocument, summary: summary, category: category);
+    public async Task StoreDocumentAsync(string content, string sourceDocument, string category, string? summary = null) =>
+        await _dbInterface.StoreDocument(content, sourceDocument, category, summary: summary);
 
-    public async Task<List<DocumentResult>> GetDocumentsAsync(string sourceDocument, string? category = null) =>
+    public async Task<List<DocumentResult>> GetDocumentsAsync(string sourceDocument, string category) =>
         await _dbInterface.GetAllDocumentsForSourceDocument(sourceDocument, category);
 
-    public async Task<List<DocumentIndexEntry>> GetDocumentIndexAsync(string? category = null) =>
+    public async Task<List<DocumentIndexEntry>> GetDocumentIndexAsync(string category) =>
         await _dbInterface.GetDistinctSourceDocuments(category);
 }

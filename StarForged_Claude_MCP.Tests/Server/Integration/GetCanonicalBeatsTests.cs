@@ -11,12 +11,12 @@ public class GetCanonicalBeatsTests(TestFixture fixture) : DocumentsTestBase(fix
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_5", null);
-        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_5", "1.0");
-        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_5", "2.0");
-        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_5", "2.1");
-        await AddTestDocument("Meanwhile, the rival adventuring party plotted in the shadows.", "SessionBeats_5", null);
-        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_5", "3.0");
+        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_5", "session_log");
+        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_5", "session_log", beatNumber: "1.0");
+        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_5", "session_log", beatNumber: "2.0");
+        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_5", "session_log", beatNumber: "2.1");
+        await AddTestDocument("Meanwhile, the rival adventuring party plotted in the shadows.", "SessionBeats_5", "session_log");
+        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_5", "session_log", beatNumber: "3.0");
 
         var request = new JsonRpcRequest
         {
@@ -27,7 +27,8 @@ public class GetCanonicalBeatsTests(TestFixture fixture) : DocumentsTestBase(fix
                 Name = "get_canonical_beats",
                 Arguments = new Dictionary<string, object>
                 {
-                    { "sessionNumber", 5 }
+                    { "sessionNumber", 5 },
+                    { "category", "session_log" }
                 }
             }
         };
@@ -68,11 +69,11 @@ public class GetCanonicalBeatsTests(TestFixture fixture) : DocumentsTestBase(fix
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_6", null, category: null);
-        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_6", "1.0", category: "exploration");
-        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_6", "2.0", category: "intrigue");
-        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_6", "2.1", category: "intrigue");
-        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_6", "3.0", category: "exploration");
+        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_6", "session_log");
+        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_6", "exploration", beatNumber: "1.0");
+        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_6", "intrigue", beatNumber: "2.0");
+        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_6", "intrigue", beatNumber: "2.1");
+        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_6", "exploration", beatNumber: "3.0");
 
         var request = new JsonRpcRequest
         {

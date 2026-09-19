@@ -7,7 +7,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 {
     public interface ISearchService
     {
-        Task<SearchResult[]> Search(string input, int topK);
+        Task<SearchResult[]> Search(string input, string category, int topK);
     }
 
     internal class SearchService : ISearchService
@@ -31,13 +31,13 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             this.logger = logger;
         }
 
-        public async Task<SearchResult[]> Search(string input, int topK)
+        public async Task<SearchResult[]> Search(string input, string category, int topK)
         {
-            logger.LogInformation("Starting search with input: {Input} and topK: {TopK}", input, topK);
+            logger.LogInformation("Starting search in category {Category} with input: {Input} and topK: {TopK}", category, input, topK);
 
             var inputChunk = unchunkableFlatTextPreprocessor.Process(input).Chunks.Single();
 
-            var similarityResults = await PerformSimilaritySearch(inputChunk, topK);
+            var similarityResults = await PerformSimilaritySearch(inputChunk, category, topK);
 
             var ids = similarityResults.Select(r => r.Id).ToArray();
 
@@ -50,15 +50,15 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             return results;
         }
 
-        private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, int topK)
+        private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, string category, int topK)
         {
             var queryVector = embeddingsService.GenerateEmbeddings(input);
 
             logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
 
-            var vectors = await vectorCache.GetAllVectors();
+            var vectors = await vectorCache.GetAllVectors(category);
 
-            logger.LogDebug("Vector count on similarity search: {VectorCount}", vectors.Count);
+            logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
 
             var similarities = vectors
                 .Select(kvp => new { Id = kvp.Key, Similarity = CosineSimilarity(queryVector, kvp.Value) })

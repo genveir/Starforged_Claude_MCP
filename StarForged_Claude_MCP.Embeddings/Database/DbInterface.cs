@@ -16,12 +16,12 @@ public class DbInterface
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
     }
 
-    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, string sourceDocument)
+    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, string sourceDocument, string category)
     {
         using var connection = new SqlConnection(_connectionString);
         var id = await connection.QuerySingleAsync<int>(
-            "insert into Embeddings (Text, Vector, SourceDocument, TokenCount) output inserted.Id values (@Text, @Vector, @SourceDocument, @TokenCount)",
-            new { Text = chunk.Text, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length });
+            "insert into Embeddings (Text, Vector, SourceDocument, TokenCount, Category) output inserted.Id values (@Text, @Vector, @SourceDocument, @TokenCount, @Category)",
+            new { Text = chunk.Text, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length, Category = category });
         return id;
     }
 
@@ -31,14 +31,15 @@ public class DbInterface
 
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "select Id, Text, SourceDocument from Embeddings where Id in @Ids",
+            "select Id, Text, SourceDocument, Category from Embeddings where Id in @Ids",
             new { Ids = ids });
 
         return results.Select(r => new TextResult
         {
             Id = r.Id,
             Text = r.Text,
-            SourceDocument = r.SourceDocument
+            SourceDocument = r.SourceDocument,
+            Category = r.Category
         }).ToList();
     }
 
@@ -54,7 +55,7 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Documents");
     }
 
-    public async Task<int> StoreDocument(string content, string sourceDocument, string? beatNumber = null, string? summary = null, string? category = null)
+    public async Task<int> StoreDocument(string content, string sourceDocument, string category, string? beatNumber = null, string? summary = null)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleAsync<int>(
@@ -68,11 +69,11 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Documents where Id = @Id", new { Id = id });
     }
 
-    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument, string? category = null)
+    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument, string category)
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "select Content, BeatNumber, Summary, Category from Documents where SourceDocument = @SourceDocument and ((@Category is null and Category is null) or Category = @Category) order by Id",
+            "select Content, BeatNumber, Summary, Category from Documents where SourceDocument = @SourceDocument and Category = @Category order by Id",
             new { SourceDocument = sourceDocument, Category = category });
 
         int sequence = 1;
@@ -82,11 +83,11 @@ public class DbInterface
             Sequence = sequence++,
             BeatNumber = (string?)r.BeatNumber,
             Summary = (string?)r.Summary,
-            Category = (string?)r.Category
+            Category = (string)r.Category
         }).ToList();
     }
 
-    public async Task<List<DocumentIndexEntry>> GetDistinctSourceDocuments(string? category = null)
+    public async Task<List<DocumentIndexEntry>> GetDistinctSourceDocuments(string category)
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
@@ -95,10 +96,10 @@ public class DbInterface
                 select distinct SourceDocument, Summary
                 from Documents
                 where Summary is not null
-                and ((@Category is null and Category is null) or Category = @Category)
+                and Category = @Category
             )
             select d.SourceDocument, string_agg(ds.Summary, ', ') as Summaries
-            from (select distinct SourceDocument from Documents where ((@Category is null and Category is null) or Category = @Category)) d
+            from (select distinct SourceDocument from Documents where Category = @Category) d
             left join DistinctSummaries ds on ds.SourceDocument = d.SourceDocument
             group by d.SourceDocument
             order by d.SourceDocument
@@ -124,19 +125,20 @@ public class DbInterface
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(
-            "select Id, Vector from Embeddings");
+            "select Id, Vector, Category from Embeddings");
 
         return results.Select(r => new VectorResult
         {
             Id = r.Id,
-            Vector = BytesToFloats((byte[])r.Vector)
+            Vector = BytesToFloats((byte[])r.Vector),
+            Category = r.Category
         }).ToList();
     }
 
     public async Task TestConnection()
     {
         using var connection = new SqlConnection(_connectionString);
-        await connection.QueryAsync<dynamic>("select top 0 Id, Text, Vector, SourceDocument, TokenCount from Embeddings");
+        await connection.QueryAsync<dynamic>("select top 0 Id, Text, Vector, SourceDocument, TokenCount, Category from Embeddings");
     }
 
     private static byte[] FloatsToBytes(float[] floats)

@@ -14,7 +14,6 @@ namespace StarForged_Claude_MCP.Embeddings.Database.Models
         [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
         public string? Summary { get; set; }
 
-        [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-        public string? Category { get; set; }
+        public string Category { get; set; } = string.Empty;
     }
 }

@@ -11,9 +11,9 @@ public class GetDocumentsTests(TestFixture fixture) : DocumentsTestBase(fixture)
     {
         await ClearTestDocuments();
 
-        await AddTestDocument("First session: the party met in Ironhaven.", "test_doc_order");
-        await AddTestDocument("Second session: the party travelled to the forest.", "test_doc_order");
-        await AddTestDocument("Third session: the dragon was defeated.", "test_doc_order");
+        await AddTestDocument("First session: the party met in Ironhaven.", "test_doc_order", "session_log");
+        await AddTestDocument("Second session: the party travelled to the forest.", "test_doc_order", "session_log");
+        await AddTestDocument("Third session: the dragon was defeated.", "test_doc_order", "session_log");
 
         var request = new JsonRpcRequest
         {
@@ -24,7 +24,8 @@ public class GetDocumentsTests(TestFixture fixture) : DocumentsTestBase(fixture)
                 Name = "get_documents",
                 Arguments = new Dictionary<string, object>
                 {
-                    { "sourceDocument", "test_doc_order" }
+                    { "sourceDocument", "test_doc_order" },
+                    { "category", "session_log" }
                 }
             }
         };
