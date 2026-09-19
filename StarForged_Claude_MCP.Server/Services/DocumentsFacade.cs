@@ -3,7 +3,7 @@ using StarForged_Claude_MCP.Embeddings.Database.Models;
 
 namespace StarForged_Claude_MCP.Server.Services;
 
-public class DocumentsFacade
+public class DocumentsFacade : IDocumentsFacade
 {
     private readonly DbInterface _dbInterface;
 

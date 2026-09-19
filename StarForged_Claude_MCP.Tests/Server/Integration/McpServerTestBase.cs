@@ -24,14 +24,8 @@ public abstract class McpServerTestBase
         };
     }
 
-    protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request)
-    {
-        var handleRequestMethod = typeof(McpServer)
-            .GetMethod("HandleRequestAsync", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-
-        var task = (Task<JsonRpcResponse>)handleRequestMethod!.Invoke(_server, [request])!;
-        return await task;
-    }
+    protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>
+        await McpServerInvoker.HandleRequestAsync(_server, request);
 
     protected async Task ClearTestMemories()
     {

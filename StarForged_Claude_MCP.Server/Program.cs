@@ -46,8 +46,8 @@ public class Program
 
         builder.Services.AddEmbeddingsServices();
 
-        builder.Services.AddSingleton<EmbeddingsFacade>();
-        builder.Services.AddSingleton<DocumentsFacade>();
+        builder.Services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
+        builder.Services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
         builder.Services.AddSingleton<McpServer>();
 
         var host = builder.Build();

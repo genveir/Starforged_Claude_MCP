@@ -5,7 +5,7 @@ using StarForged_Claude_MCP.Embeddings.Services.Models;
 
 namespace StarForged_Claude_MCP.Server.Services;
 
-public class EmbeddingsFacade
+public class EmbeddingsFacade : IEmbeddingsFacade
 {
     private readonly ISearchService searchService;
     private readonly IDocumentProcessingService documentProcessingService;

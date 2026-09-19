@@ -40,8 +40,8 @@ public class TestFixture : IAsyncLifetime
 
         services.AddEmbeddingsServices();
 
-        services.AddSingleton<EmbeddingsFacade>();
-        services.AddSingleton<DocumentsFacade>();
+        services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
+        services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
         services.AddSingleton<McpServer>();
 
         services.AddSingleton<IConfiguration>(configuration);

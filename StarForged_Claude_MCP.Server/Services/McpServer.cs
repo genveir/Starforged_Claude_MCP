@@ -7,12 +7,12 @@ namespace StarForged_Claude_MCP.Server.Services;
 
 public class McpServer
 {
-    private readonly EmbeddingsFacade _embeddings;
-    private readonly DocumentsFacade _documents;
+    private readonly IEmbeddingsFacade _embeddings;
+    private readonly IDocumentsFacade _documents;
     private readonly ILogger<McpServer> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
 
-    public McpServer(EmbeddingsFacade backend, DocumentsFacade documents, ILogger<McpServer> logger)
+    public McpServer(IEmbeddingsFacade backend, IDocumentsFacade documents, ILogger<McpServer> logger)
     {
         _embeddings = backend;
         _documents = documents;
