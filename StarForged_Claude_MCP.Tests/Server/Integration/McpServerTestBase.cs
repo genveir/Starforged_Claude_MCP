@@ -1,6 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
 using System.Text.Json;
@@ -24,15 +23,29 @@ public abstract class McpServerTestBase
         };
     }
 
+    protected DbInterface Db => _fixture.Services.GetRequiredService<DbInterface>();
+
     protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>
         await McpServerInvoker.HandleRequestAsync(_server, request);
 
-    protected async Task ClearTestMemories()
-    {
-        var dbInterface = _fixture.Services.GetRequiredService<DbInterface>();
-        await dbInterface.DeleteAllEmbeddings();
+    /// <summary>Deleting the documents takes their embedded chunks with them, by cascade.</summary>
+    protected async Task ClearTestDocuments() => await Db.DeleteAllDocuments();
 
-        var vectorCache = _fixture.Services.GetRequiredService<VectorCacheService>();
-        await vectorCache.RefreshCache();
+    protected async Task ClearTestBeats() => await Db.DeleteAllBeats();
+
+    protected async Task<JsonRpcResponse> CallTool(string id, string name, Dictionary<string, object> arguments) =>
+        await InvokeServerMethod(new JsonRpcRequest
+        {
+            Id = id,
+            Method = "tools/call",
+            Params = new CallToolParams { Name = name, Arguments = arguments }
+        });
+
+    /// <summary>The JSON a successful tool call produced, unwrapped from its content envelope.</summary>
+    protected JsonElement ToolPayload(JsonRpcResponse response)
+    {
+        var result = JsonSerializer.Deserialize<CallToolResult>(
+            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
+        return JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
     }
 }

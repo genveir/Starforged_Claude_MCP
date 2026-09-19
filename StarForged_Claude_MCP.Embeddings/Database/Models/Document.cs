@@ -2,13 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace StarForged_Claude_MCP.Embeddings.Database.Models;
 
-/// <summary>
-/// One document as it appears in a category listing: enough to decide whether to fetch it,
-/// without its content.
-/// </summary>
-public class DocumentIndexEntry
+public class Document
 {
+    public int Id { get; set; }
+
+    public string Category { get; set; } = string.Empty;
+
     public string Filename { get; set; } = string.Empty;
+
+    public string Content { get; set; } = string.Empty;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Summary { get; set; }

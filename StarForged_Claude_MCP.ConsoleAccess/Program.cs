@@ -101,9 +101,9 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--embedded | --document]");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --continuous <sourceDocument> [--embedded | --document] [--beatLogging]");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <sourceDocument>");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index] [--keep-summaries]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <filename>");
         Console.WriteLine("  .\\ConsoleAccess.exe export <category> --output <folder> [--overwrite]");
         Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
         Console.WriteLine();

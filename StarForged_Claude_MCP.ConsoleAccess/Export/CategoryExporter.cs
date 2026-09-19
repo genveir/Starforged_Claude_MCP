@@ -13,7 +13,7 @@ public class CategoryExporter
 
     public async Task ExportCategory(ExportOptions options)
     {
-        var index = await dbInterface.GetDistinctSourceDocuments(options.Category);
+        var index = await dbInterface.GetDocumentIndex(options.Category);
 
         if (index.Count == 0)
         {
@@ -28,7 +28,7 @@ public class CategoryExporter
 
         foreach (var entry in index)
         {
-            var path = Path.Combine(options.OutputFolder, $"{SanitiseFileName(entry.SourceDocument)}.md");
+            var path = Path.Combine(options.OutputFolder, SanitiseFileName(entry.Filename));
 
             if (File.Exists(path) && !options.Overwrite)
             {
@@ -37,11 +37,11 @@ public class CategoryExporter
                 continue;
             }
 
-            var documents = await dbInterface.GetAllDocumentsForSourceDocument(entry.SourceDocument, options.Category);
-            var content = string.Join(Environment.NewLine + Environment.NewLine, documents.Select(d => d.Content));
+            var document = await dbInterface.GetDocument(options.Category, entry.Filename);
+            if (document == null) continue;
 
-            await File.WriteAllTextAsync(path, content);
-            Console.WriteLine($"{entry.SourceDocument} -> {path} ({documents.Count} chunks)");
+            await File.WriteAllTextAsync(path, document.Content);
+            Console.WriteLine($"{entry.Filename} -> {path}");
             written++;
         }
 
@@ -52,9 +52,9 @@ public class CategoryExporter
         }
     }
 
-    private static string SanitiseFileName(string sourceDocument)
+    private static string SanitiseFileName(string filename)
     {
-        var sanitised = string.Concat(sourceDocument.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        var sanitised = string.Concat(filename.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         return string.IsNullOrWhiteSpace(sanitised) ? "untitled" : sanitised;
     }
 }

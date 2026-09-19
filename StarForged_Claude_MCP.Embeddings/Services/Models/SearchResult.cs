@@ -2,7 +2,7 @@
 
 namespace StarForged_Claude_MCP.Embeddings.Services.Models
 {
-    public record SearchResult(string Text, float SimilarityScore, [property: JsonIgnore] int Id)
+    public record SearchResult(string Text, float SimilarityScore, [property: JsonIgnore] int Id, string Filename)
     {
         public string BriefSummary
         {

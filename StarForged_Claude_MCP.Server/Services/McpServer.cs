@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.Logging;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
@@ -104,65 +103,17 @@ public class McpServer
             new()
             {
                 Name = "search_index",
-                Description = "Search for relevant chunks by semantic similarity within a single category. Returns IDs, scores, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs",
+                Description = "Search for relevant chunks by semantic similarity within a single category. Only documents stored with indexed=true are searchable. Returns IDs, scores, filenames and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs, or get_document to fetch the whole file a chunk came from",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
                         query = new { type = "string", description = "Natural language search query" },
-                        category = new { type = "string", description = "Category to search; only chunks stored under this category are considered" },
+                        category = new { type = "string", description = "Category to search; only chunks from documents in this category are considered" },
                         topK = new { type = "number", description = "Number of results to return (default: 3, max: 10)" }
                     },
                     required = new[] { "query", "category" }
-                }
-            },
-            new()
-            {
-                Name = "add_memory",
-                Description = "Chunks and stores text and makes it searchable",
-                InputSchema = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        text = new { type = "string", description = "The content to store" },
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
-                        category = new { type = "string", description = "Category label attached to every chunk stored from this text" }
-                    },
-                    required = new[] { "text", "sourceDocument", "category" }
-                }
-            },
-            new()
-            {
-                Name = "add_document",
-                Description = "Stores a document verbatim, other documents with the same sourceDocument will be stored and retrievable in sequence.",
-                InputSchema = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        text = new { type = "string", description = "The content to store" },
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
-                        summary = new { type = "string", description = "Optional short summary of this document, surfaced in document_index" },
-                        category = new { type = "string", description = "Category label, can be used to filter results in get_documents" }
-                    },
-                    required = new[] { "text", "sourceDocument", "category" }
-                }
-            },
-            new()
-            {
-                Name = "get_documents",
-                Description = "Retrieves all documents stored with the given sourceDocument in the order they were added. If you found this sourceDocument via a category-filtered document_index call, pass the same category here.",
-                InputSchema = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
-                        category = new { type = "string", description = "Category filter; only documents with a matching category are returned" }
-                    },
-                    required = new[] { "sourceDocument", "category" }
                 }
             },
             new()
@@ -181,16 +132,112 @@ public class McpServer
             },
             new()
             {
-                Name = "document_index",
-                Description = "Returns the distinct sourceDocuments stored in the document store. If you filter by category here, pass the same category to get_documents when retrieving documents from those sourceDocuments.",
+                Name = "add_document",
+                Description = "Stores a new document under a filename within a category. Fails if that category already holds a document with the same filename; use update_document to replace one.",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category filter; only sourceDocuments containing documents with a matching category are returned" }
+                        category = new { type = "string", description = "Category the document belongs to; categories act as separate namespaces" },
+                        filename = new { type = "string", description = "Filename, unique within the category (e.g., 'session_5.md')" },
+                        text = new { type = "string", description = "The full content of the document. Write well-formed Markdown with '#' and '##' headers: sections are what the document is chunked on, and their titles are what search results are labelled with. Content placed before the first header is stored, but search results for it carry no section label." },
+                        summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
+                        indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it" }
+                    },
+                    required = new[] { "category", "filename", "text", "indexed" }
+                }
+            },
+            new()
+            {
+                Name = "update_document",
+                Description = "Replaces the entire content of an existing document. Anything indexed for it is rebuilt from the new content, or removed when indexed is false.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to replace" },
+                        text = new { type = "string", description = "The full replacement content; this is not a patch. Write well-formed Markdown with '#' and '##' headers: sections are what the document is chunked on, and their titles are what search results are labelled with." },
+                        summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
+                        indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it" }
+                    },
+                    required = new[] { "category", "filename", "text", "indexed" }
+                }
+            },
+            new()
+            {
+                Name = "delete_document",
+                Description = "Permanently deletes a document and anything indexed for it.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to delete" }
+                    },
+                    required = new[] { "category", "filename" }
+                }
+            },
+            new()
+            {
+                Name = "get_document",
+                Description = "Retrieves one document in full by category and filename, as listed by document_index.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to retrieve" }
+                    },
+                    required = new[] { "category", "filename" }
+                }
+            },
+            new()
+            {
+                Name = "get_document_summary",
+                Description = "Retrieves one document's summary without its content. Useful after search_index, where several chunks of one file can be returned at once: fetch the file's summary once to see what it is, rather than judging it from each chunk. The summary is null for documents stored without one.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document, as returned by search_index or document_index" }
+                    },
+                    required = new[] { "category", "filename" }
+                }
+            },
+            new()
+            {
+                Name = "document_index",
+                Description = "Lists the documents in a category with their summaries, without their content. Use get_document to fetch one in full.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category to list" }
                     },
                     required = new[] { "category" }
+                }
+            },
+            new()
+            {
+                Name = "get_canonical_beats",
+                Description = "Retrieves the canonical beats of a session in narrative order. A beat that was later rewritten is returned in its original position with its newest content; superseded versions are not returned. Beats with no number of their own, such as vignettes and interludes, are returned in the order they were written.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the session belongs to" },
+                        sessionNumber = new { type = "number", description = "The session number to retrieve beats for" }
+                    },
+                    required = new[] { "category", "sessionNumber" }
                 }
             },
             new()
@@ -201,21 +248,6 @@ public class McpServer
                 {
                     type = "object",
                     properties = new { }
-                }
-            },
-            new()
-            {
-                Name = "get_canonical_beats",
-                Description = "Retrieves the canonical beats for a given session in the order they were added. Stored documents are full GM responses; beats are embedded within them alongside mechanical confirmations and conversational content.",
-                InputSchema = new
-                {
-                    type = "object",
-                    properties = new
-                    {
-                        sessionNumber = new { type = "number", description = "The session number to retrieve beats for" },
-                        category = new { type = "string", description = "Category filter; only beats with a matching category are returned" }
-                    },
-                    required = new[] { "sessionNumber", "category" }
                 }
             }
         };
@@ -294,11 +326,13 @@ public class McpServer
         {
             "search_index" => await ExecuteSearchAsync(arguments),
             "retrieve_search_results" => await ExecuteRetrieveSearchResultsAsync(arguments),
-            "add_memory" => await ExecuteAddMemoryAsync(arguments),
             "add_document" => await ExecuteAddDocumentAsync(arguments),
-            "get_documents" => await ExecuteGetDocumentsAsync(arguments),
-            "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
+            "update_document" => await ExecuteUpdateDocumentAsync(arguments),
+            "delete_document" => await ExecuteDeleteDocumentAsync(arguments),
+            "get_document" => await ExecuteGetDocumentAsync(arguments),
+            "get_document_summary" => await ExecuteGetDocumentSummaryAsync(arguments),
             "document_index" => await ExecuteDocumentIndexAsync(arguments),
+            "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
             "roll_dice" => ExecuteRollDice(),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
         };
@@ -306,17 +340,8 @@ public class McpServer
 
     private async Task<string> ExecuteSearchAsync(Dictionary<string, object> arguments)
     {
-        var query = arguments["query"].ToString() ?? "";
+        var query = RequireString(arguments, "Query", maxLength: 10_000);
         var category = RequireCategory(arguments);
-
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            throw new ArgumentException("Query cannot be empty");
-        }
-        if (query.Length > 10000)
-        {
-            throw new ArgumentException("Query exceeds maximum length of 10,000 characters");
-        }
 
         var topK = arguments.ContainsKey("topK")
             ? (arguments["topK"] is JsonElement je ? je.GetInt32() : Convert.ToInt32(arguments["topK"]))
@@ -326,10 +351,12 @@ public class McpServer
         _logger.LogDebug("Executing search: category={Category}, query length={QueryLength}, topK={TopK}", category, query.Length, topK);
         var results = await _embeddings.SearchAsync(query, category, topK);
         _logger.LogDebug("Search returned {ResultCount} result(s)", results.Length);
+
         var briefResults = results.Select(r => new
         {
             id = r.Id,
             score = r.SimilarityScore,
+            filename = r.Filename,
             summary = r.BriefSummary
         }).ToArray();
         return JsonSerializer.Serialize(new { results = briefResults }, _jsonOptions);
@@ -358,87 +385,117 @@ public class McpServer
         return JsonSerializer.Serialize(new { results }, _jsonOptions);
     }
 
-    private async Task<string> ExecuteAddMemoryAsync(Dictionary<string, object> arguments)
-    {
-        var text = arguments["text"].ToString() ?? "";
-        var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
-        var category = RequireCategory(arguments);
-
-        if (string.IsNullOrWhiteSpace(text))
-        {
-            throw new ArgumentException("Text cannot be empty");
-        }
-        if (text.Length > 1_000_000)
-        {
-            throw new ArgumentException("Text exceeds maximum length of 1,000,000 characters");
-        }
-        if (string.IsNullOrWhiteSpace(sourceDocument))
-        {
-            throw new ArgumentException("SourceDocument cannot be empty");
-        }
-        if (sourceDocument.Length > 500)
-        {
-            throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
-        }
-
-        _logger.LogDebug("Executing add_memory: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
-        var id = await _embeddings.AddMemoryAsync(text, sourceDocument, category);
-        _logger.LogDebug("add_memory stored {ChunkCount} chunk(s) for sourceDocument={SourceDocument}", id.Length, sourceDocument);
-        return JsonSerializer.Serialize(new { message = "Memory stored successfully", Id = id }, _jsonOptions);
-    }
-
     private async Task<string> ExecuteAddDocumentAsync(Dictionary<string, object> arguments)
     {
-        var text = arguments["text"].ToString() ?? "";
-        var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
-        var summary = arguments.TryGetValue("summary", out var s) ? s?.ToString() : null;
         var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var text = RequireString(arguments, "Text", maxLength: 1_000_000);
+        var summary = OptionalSummary(arguments);
+        var indexed = RequireBool(arguments, "indexed");
 
-        if (string.IsNullOrWhiteSpace(text))
-            throw new ArgumentException("Text cannot be empty");
-        if (text.Length > 1_000_000)
-            throw new ArgumentException("Text exceeds maximum length of 1,000,000 characters");
-        if (string.IsNullOrWhiteSpace(sourceDocument))
-            throw new ArgumentException("SourceDocument cannot be empty");
-        if (sourceDocument.Length > 500)
-            throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
+        _logger.LogDebug("Executing add_document: category={Category}, filename={Filename}, indexed={Indexed}, textLength={TextLength}",
+            category, filename, indexed, text.Length);
 
-        _logger.LogDebug("Executing add_document: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
-        await _documents.StoreDocumentAsync(text, sourceDocument, category, summary: summary);
-        _logger.LogDebug("add_document stored document for sourceDocument={SourceDocument}", sourceDocument);
+        var stored = await _documents.AddDocumentAsync(category, filename, text, summary, indexed);
+
+        if (!stored)
+            throw new ArgumentException($"A document named '{filename}' already exists in category '{category}'. Use update_document to replace it.");
+
         return JsonSerializer.Serialize(new { message = "Document stored successfully" }, _jsonOptions);
     }
 
-    private async Task<string> ExecuteGetDocumentsAsync(Dictionary<string, object> arguments)
+    private async Task<string> ExecuteUpdateDocumentAsync(Dictionary<string, object> arguments)
     {
-        var sourceDocument = arguments["sourceDocument"].ToString() ?? "";
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var text = RequireString(arguments, "Text", maxLength: 1_000_000);
+        var summary = OptionalSummary(arguments);
+        var indexed = RequireBool(arguments, "indexed");
+
+        _logger.LogDebug("Executing update_document: category={Category}, filename={Filename}, indexed={Indexed}, textLength={TextLength}",
+            category, filename, indexed, text.Length);
+
+        var updated = await _documents.UpdateDocumentAsync(category, filename, text, summary, indexed);
+
+        if (!updated)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        return JsonSerializer.Serialize(new { message = "Document updated successfully" }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteDeleteDocumentAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+
+        _logger.LogDebug("Executing delete_document: category={Category}, filename={Filename}", category, filename);
+
+        var deleted = await _documents.DeleteDocumentAsync(category, filename);
+
+        if (!deleted)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        return JsonSerializer.Serialize(new { message = "Document deleted successfully" }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteGetDocumentAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+
+        _logger.LogDebug("Executing get_document: category={Category}, filename={Filename}", category, filename);
+
+        var document = await _documents.GetDocumentAsync(category, filename);
+
+        if (document == null)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        return JsonSerializer.Serialize(new { document }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteGetDocumentSummaryAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+
+        _logger.LogDebug("Executing get_document_summary: category={Category}, filename={Filename}", category, filename);
+
+        var entry = await _documents.GetDocumentSummaryAsync(category, filename);
+
+        if (entry == null)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        // Written out by hand so that a missing summary comes back as an explicit null rather
+        // than an absent field, which would read as though the document had no summary field at all.
+        return JsonSerializer.Serialize(new
+        {
+            filename = entry.Filename,
+            summary = entry.Summary,
+            indexed = entry.Indexed
+        }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
+    {
         var category = RequireCategory(arguments);
 
-        if (string.IsNullOrWhiteSpace(sourceDocument))
-            throw new ArgumentException("SourceDocument cannot be empty");
-        if (sourceDocument.Length > 500)
-            throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
-
-        _logger.LogDebug("Executing get_documents: sourceDocument={SourceDocument}", sourceDocument);
-        var documents = await _documents.GetDocumentsAsync(sourceDocument, category);
-        _logger.LogDebug("get_documents returned {DocumentCount} document(s) for sourceDocument={SourceDocument}", documents.Count, sourceDocument);
+        _logger.LogDebug("Executing document_index: category={Category}", category);
+        var documents = await _documents.GetDocumentIndexAsync(category);
+        _logger.LogDebug("document_index returned {Count} document(s)", documents.Count);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
     }
 
     private async Task<string> ExecuteGetCanonicalBeatsAsync(Dictionary<string, object> arguments)
     {
+        var category = RequireCategory(arguments);
         var sessionNumber = arguments["sessionNumber"] is JsonElement je
             ? je.GetInt32()
             : Convert.ToInt32(arguments["sessionNumber"]);
-        var category = RequireCategory(arguments);
 
-        var sourceDocument = $"SessionBeats_{sessionNumber}";
-
-        _logger.LogDebug("Executing get_canonical_beats: sessionNumber={SessionNumber}", sessionNumber);
-        var allDocuments = await _documents.GetDocumentsAsync(sourceDocument, category);
-        var documents = FilterCanonicalBeats(allDocuments);
-        _logger.LogDebug("get_canonical_beats returned {DocumentCount} document(s) for sessionNumber={SessionNumber}", documents.Count, sessionNumber);
-        return JsonSerializer.Serialize(new { documents }, _jsonOptions);
+        _logger.LogDebug("Executing get_canonical_beats: category={Category}, sessionNumber={SessionNumber}", category, sessionNumber);
+        var beats = await _documents.GetCanonicalBeatsAsync(category, sessionNumber);
+        _logger.LogDebug("get_canonical_beats returned {BeatCount} beat(s)", beats.Count);
+        return JsonSerializer.Serialize(new { beats }, _jsonOptions);
     }
 
     private string ExecuteRollDice()
@@ -450,51 +507,38 @@ public class McpServer
         return JsonSerializer.Serialize(new { actionDie, challengeDice }, _jsonOptions);
     }
 
-    private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
-    {
-        var category = RequireCategory(arguments);
+    private static string RequireCategory(Dictionary<string, object> arguments) =>
+        RequireString(arguments, "Category", maxLength: 200);
 
-        _logger.LogDebug("Executing document_index");
-        var sourceDocuments = await _documents.GetDocumentIndexAsync(category);
-        _logger.LogDebug("document_index returned {Count} source document(s)", sourceDocuments.Count);
-        return JsonSerializer.Serialize(new { sourceDocuments }, _jsonOptions);
+    /// <param name="name">The argument's name, capitalised for the error message; looked up camel-cased.</param>
+    private static string RequireString(Dictionary<string, object> arguments, string name, int maxLength)
+    {
+        var key = char.ToLowerInvariant(name[0]) + name[1..];
+        var value = arguments.TryGetValue(key, out var raw) ? raw?.ToString() : null;
+
+        if (string.IsNullOrWhiteSpace(value))
+            throw new ArgumentException($"{name} cannot be empty");
+        if (value.Length > maxLength)
+            throw new ArgumentException($"{name} exceeds maximum length of {maxLength:N0} characters");
+
+        return value;
     }
 
-
-    private static string RequireCategory(Dictionary<string, object> arguments)
+    private static bool RequireBool(Dictionary<string, object> arguments, string key)
     {
-        var category = arguments.TryGetValue("category", out var c) ? c?.ToString() : null;
+        if (!arguments.TryGetValue(key, out var raw) || raw == null)
+            throw new ArgumentException($"{char.ToUpperInvariant(key[0]) + key[1..]} is required");
 
-        if (string.IsNullOrWhiteSpace(category))
-            throw new ArgumentException("Category cannot be empty");
-        if (category.Length > 200)
-            throw new ArgumentException("Category exceeds maximum length of 200 characters");
-
-        return category;
+        return raw is JsonElement je ? je.GetBoolean() : Convert.ToBoolean(raw);
     }
 
-    private static List<DocumentResult> FilterCanonicalBeats(List<DocumentResult> documents)
+    private static string? OptionalSummary(Dictionary<string, object> arguments)
     {
-        var maxVersionByN = documents
-            .Where(d => d.BeatNumber != null)
-            .GroupBy(d => int.Parse(d.BeatNumber!.Split('.')[0]))
-            .ToDictionary(g => g.Key, g => g.Max(d => int.Parse(d.BeatNumber!.Split('.')[1])));
+        var summary = arguments.TryGetValue("summary", out var raw) ? raw?.ToString() : null;
 
-        var filtered = documents
-            .Where(d =>
-            {
-                if (d.BeatNumber == null) return true;
-                var parts = d.BeatNumber.Split('.');
-                var n = int.Parse(parts[0]);
-                var v = int.Parse(parts[1]);
-                return v == maxVersionByN[n];
-            })
-            .ToList();
+        if (summary != null && summary.Length > 512)
+            throw new ArgumentException("Summary exceeds maximum length of 512 characters");
 
-        int sequence = 1;
-        foreach (var doc in filtered)
-            doc.Sequence = sequence++;
-
-        return filtered;
+        return string.IsNullOrWhiteSpace(summary) ? null : summary;
     }
 }

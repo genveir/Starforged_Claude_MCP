@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.ML.OnnxRuntime;
+﻿using Microsoft.ML.OnnxRuntime;
 using Microsoft.ML.OnnxRuntime.Tensors;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 
@@ -7,13 +6,10 @@ namespace StarForged_Claude_MCP.Embeddings.Services;
 
 internal sealed class EmbeddingsService : IDisposable
 {
-    private readonly VectorCacheService _vectorCache;
     private readonly InferenceSession _session;
 
-    public EmbeddingsService(VectorCacheService vectorCache, IConfiguration configuration)
+    public EmbeddingsService()
     {
-        _vectorCache = vectorCache;
-
         var modelPath = Path.Combine(AppContext.BaseDirectory, "model.onnx");
 
         if (!File.Exists(modelPath))

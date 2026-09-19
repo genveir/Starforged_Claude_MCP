@@ -19,9 +19,10 @@ public class ToolDispatchTests
         Dictionary<string, object> Arguments,
         Action<Mock<IEmbeddingsFacade>, Mock<IDocumentsFacade>> VerifyDispatch);
 
+    private const string Category = "lore";
+    private const string Filename = "derelict.md";
     private const string Text = "A derelict drifts in the Forge.";
-    private const string SourceDocument = "campaign_session_5";
-    private const string Category = "session_log";
+    private const string Summary = "A short summary.";
 
     /// <summary>
     /// One representative call per advertised tool. Every advertised tool must appear here —
@@ -43,31 +44,56 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents) =>
                 embeddings.Verify(f => f.RetrieveByIdsAsync(It.Is<int[]>(ids => ids.SequenceEqual(new[] { 7, 11 }))), Times.Once)),
 
-        ["add_memory"] = new ToolCase(
-            Arguments: new Dictionary<string, object>
-            {
-                ["text"] = Text,
-                ["sourceDocument"] = SourceDocument,
-                ["category"] = Category
-            },
-            VerifyDispatch: (embeddings, documents) =>
-                embeddings.Verify(f => f.AddMemoryAsync(Text, SourceDocument, Category), Times.Once)),
-
         ["add_document"] = new ToolCase(
             Arguments: new Dictionary<string, object>
             {
+                ["category"] = Category,
+                ["filename"] = Filename,
                 ["text"] = Text,
-                ["sourceDocument"] = SourceDocument,
-                ["summary"] = "A short summary.",
-                ["category"] = Category
+                ["summary"] = Summary,
+                ["indexed"] = true
             },
             VerifyDispatch: (embeddings, documents) =>
-                documents.Verify(f => f.StoreDocumentAsync(Text, SourceDocument, Category, "A short summary."), Times.Once)),
+                documents.Verify(f => f.AddDocumentAsync(Category, Filename, Text, Summary, true), Times.Once)),
 
-        ["get_documents"] = new ToolCase(
-            Arguments: new Dictionary<string, object> { ["sourceDocument"] = SourceDocument, ["category"] = Category },
+        ["update_document"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["text"] = Text,
+                ["summary"] = Summary,
+                ["indexed"] = false
+            },
             VerifyDispatch: (embeddings, documents) =>
-                documents.Verify(f => f.GetDocumentsAsync(SourceDocument, Category), Times.Once)),
+                documents.Verify(f => f.UpdateDocumentAsync(Category, Filename, Text, Summary, false), Times.Once)),
+
+        ["delete_document"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename
+            },
+            VerifyDispatch: (embeddings, documents) =>
+                documents.Verify(f => f.DeleteDocumentAsync(Category, Filename), Times.Once)),
+
+        ["get_document"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename
+            },
+            VerifyDispatch: (embeddings, documents) =>
+                documents.Verify(f => f.GetDocumentAsync(Category, Filename), Times.Once)),
+
+        ["get_document_summary"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename
+            },
+            VerifyDispatch: (embeddings, documents) =>
+                documents.Verify(f => f.GetDocumentSummaryAsync(Category, Filename), Times.Once)),
 
         ["document_index"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
@@ -75,9 +101,13 @@ public class ToolDispatchTests
                 documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once)),
 
         ["get_canonical_beats"] = new ToolCase(
-            Arguments: new Dictionary<string, object> { ["sessionNumber"] = 5, ["category"] = Category },
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["sessionNumber"] = 5
+            },
             VerifyDispatch: (embeddings, documents) =>
-                documents.Verify(f => f.GetDocumentsAsync("SessionBeats_5", Category), Times.Once)),
+                documents.Verify(f => f.GetCanonicalBeatsAsync(Category, 5), Times.Once)),
 
         ["roll_dice"] = new ToolCase(
             Arguments: new Dictionary<string, object>(),
@@ -162,8 +192,6 @@ public class ToolDispatchTests
 
         mock.Setup(f => f.SearchAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<int>()))
             .ReturnsAsync(Array.Empty<SearchResult>());
-        mock.Setup(f => f.AddMemoryAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(Array.Empty<int>());
         mock.Setup(f => f.RetrieveByIdsAsync(It.IsAny<int[]>()))
             .ReturnsAsync(Array.Empty<TextResult>());
 
@@ -174,12 +202,20 @@ public class ToolDispatchTests
     {
         var mock = new Mock<IDocumentsFacade>(MockBehavior.Strict);
 
-        mock.Setup(f => f.StoreDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
-            .Returns(Task.CompletedTask);
-        mock.Setup(f => f.GetDocumentsAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(new List<DocumentResult>());
+        mock.Setup(f => f.AddDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.DeleteDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.GetDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new Document());
+        mock.Setup(f => f.GetDocumentSummaryAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(new DocumentIndexEntry());
         mock.Setup(f => f.GetDocumentIndexAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<DocumentIndexEntry>());
+        mock.Setup(f => f.GetCanonicalBeatsAsync(It.IsAny<string>(), It.IsAny<int>()))
+            .ReturnsAsync(new List<Beat>());
 
         return mock;
     }

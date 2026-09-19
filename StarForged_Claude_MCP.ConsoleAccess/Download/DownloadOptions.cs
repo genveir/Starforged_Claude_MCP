@@ -1,6 +1,6 @@
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
-public record DownloadOptions(string Category, string SourceDocument) : IConsoleAccessOptions
+public record DownloadOptions(string Category, string Filename) : IConsoleAccessOptions
 {
     public static DownloadOptions? Parse(string[] args)
     {
@@ -19,6 +19,6 @@ public record DownloadOptions(string Category, string SourceDocument) : IConsole
 
         Console.WriteLine("Download Options:");
         Console.WriteLine("  <category>        The category the documents were stored under");
-        Console.WriteLine("  <sourceDocument>  The source document name to download");
+        Console.WriteLine("  <filename>        The filename of the document to download");
     }
 }

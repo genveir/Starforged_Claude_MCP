@@ -1,198 +1,114 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
 public class RetrieveSearchResultsTests(TestFixture fixture) : McpServerTestBase(fixture)
 {
-    [Fact]
-    public async Task RetrieveSearchResults_ShouldReturnFullText()
-    {
-        var fullText = "The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.";
-        var ids = await AddTestMemoryAndGetIds(fullText, "test_retrieve_full");
-
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "retrieve_search_results",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "ids", ids.Cast<object>().ToArray() }
-                }
-            }
-        };
-
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var results = toolResponse.GetProperty("results").EnumerateArray().ToArray();
-
-        results.Should().HaveCount(1);
-        results[0].GetProperty("text").GetString().Should().Be(fullText);
-    }
+    private const string Category = "lore";
 
     [Fact]
     public async Task SearchThenRetrieve_EndToEnd_ShouldYieldFullText()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
         var fullText = "The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.";
-        await AddTestMemory(fullText, "test_retrieve_e2e");
+        await AddIndexedDocument("dragon.md", fullText);
 
-        var searchRequest = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "dragon guarding hoard" },
-                    { "category", "lore" },
-                    { "topK", 1 }
-                }
-            }
-        };
+        var searchResults = await Search("dragon guarding hoard", topK: 1);
+        searchResults.Should().ContainSingle();
 
-        var searchResponse = await InvokeServerMethod(searchRequest);
-        searchResponse.Error.Should().BeNull();
+        var id = searchResults[0].GetProperty("id").GetInt32();
 
-        var searchResult = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(searchResponse.Result, _jsonOptions), _jsonOptions);
-        var searchJson = JsonSerializer.Deserialize<JsonElement>(searchResult!.Content[0].Text, _jsonOptions);
-        var ids = searchJson.GetProperty("results")
-            .EnumerateArray()
-            .Select(e => e.GetProperty("id").GetInt32())
-            .Cast<object>()
-            .ToArray();
+        var retrieved = await Retrieve([id]);
 
-        var retrieveRequest = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "retrieve_search_results",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "ids", ids }
-                }
-            }
-        };
-
-        var retrieveResponse = await InvokeServerMethod(retrieveRequest);
-        retrieveResponse.Error.Should().BeNull();
-
-        var retrieveResult = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(retrieveResponse.Result, _jsonOptions), _jsonOptions);
-        var retrieveJson = JsonSerializer.Deserialize<JsonElement>(retrieveResult!.Content[0].Text, _jsonOptions);
-        var texts = retrieveJson.GetProperty("results")
-            .EnumerateArray()
-            .Select(e => e.GetProperty("text").GetString())
-            .ToArray();
-
-        texts.Should().Contain(fullText);
+        retrieved.Should().ContainSingle();
+        retrieved[0].GetProperty("text").GetString().Should().Be(fullText);
+        retrieved[0].GetProperty("filename").GetString().Should().Be("dragon.md");
     }
 
     [Fact]
-    public async Task RetrieveSearchResults_ShouldHonourRequestedIdOrder()
+    public async Task RetrieveSearchResults_ShouldReturnResultsInTheOrderRequested()
     {
-        var idsA = await AddTestMemoryAndGetIds("The blacksmith hammered iron at the forge.", "test_retrieve_order");
-        var idsB = await AddTestMemoryAndGetIds("The baker kneaded dough in the kitchen.", "test_retrieve_order");
+        await ClearTestDocuments();
 
-        var idA = idsA[0];
-        var idB = idsB[0];
+        await AddIndexedDocument("first.md", "The blacksmith hammered the glowing iron on the anvil.");
+        await AddIndexedDocument("second.md", "The spacecraft entered orbit around the red planet.");
 
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "retrieve_search_results",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "ids", new object[] { idB, idA } }
-                }
-            }
-        };
+        var searchResults = await Search("blacksmith anvil spacecraft orbit", topK: 2);
+        searchResults.Should().HaveCount(2);
 
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
+        var ids = searchResults.Select(r => r.GetProperty("id").GetInt32()).ToArray();
+        var reversed = ids.Reverse().ToArray();
 
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var results = toolResponse.GetProperty("results").EnumerateArray().ToArray();
+        var retrieved = await Retrieve(reversed);
 
-        results.Should().HaveCount(2);
-        results[0].GetProperty("text").GetString().Should().Be("The baker kneaded dough in the kitchen.");
-        results[1].GetProperty("text").GetString().Should().Be("The blacksmith hammered iron at the forge.");
+        retrieved.Select(r => r.GetProperty("id").GetInt32()).Should().Equal(reversed);
     }
 
     [Fact]
-    public async Task RetrieveSearchResults_ShouldOmitUnknownIds()
+    public async Task RetrieveSearchResults_ShouldOmitIdsThatDoNotExist()
     {
-        var ids = await AddTestMemoryAndGetIds("The scout reported enemy movements at the border.", "test_retrieve_omit");
-        var knownId = ids[0];
+        await ClearTestDocuments();
 
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "retrieve_search_results",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "ids", new object[] { knownId, 999999 } }
-                }
-            }
-        };
+        await AddIndexedDocument("only.md", "The orchestra performed to a standing ovation.");
 
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
+        var searchResults = await Search("orchestra ovation", topK: 1);
+        var realId = searchResults[0].GetProperty("id").GetInt32();
 
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var results = toolResponse.GetProperty("results").EnumerateArray().ToArray();
+        var retrieved = await Retrieve([realId, 999_999]);
 
-        results.Should().HaveCount(1);
-        results[0].GetProperty("text").GetString().Should().Be("The scout reported enemy movements at the border.");
+        retrieved.Should().ContainSingle();
+        retrieved[0].GetProperty("id").GetInt32().Should().Be(realId);
     }
 
-    private async Task AddTestMemory(string text, string sourceDocument)
+    [Fact]
+    public async Task RetrieveSearchResults_WithNoIds_ShouldReturnError()
     {
-        await AddTestMemoryAndGetIds(text, sourceDocument);
+        var response = await CallTool("40", "retrieve_search_results", new Dictionary<string, object>
+        {
+            ["ids"] = Array.Empty<object>()
+        });
+
+        response.Error.Should().NotBeNull();
+        response.Error.Code.Should().Be(-32602);
+        response.Error.Message.Should().Contain("cannot be empty");
     }
 
-    private async Task<int[]> AddTestMemoryAndGetIds(string text, string sourceDocument)
+    private async Task AddIndexedDocument(string filename, string text)
     {
-        var request = new JsonRpcRequest
+        var response = await CallTool(Guid.NewGuid().ToString(), "add_document", new Dictionary<string, object>
         {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "add_memory",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "text", text },
-                    { "sourceDocument", sourceDocument },
-                    { "category", "lore" }
-                }
-            }
-        };
+            ["category"] = Category,
+            ["filename"] = filename,
+            ["text"] = text,
+            ["indexed"] = true
+        });
 
-        var response = await InvokeServerMethod(request);
         response.Error.Should().BeNull();
+    }
 
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        return toolResponse.GetProperty("id").EnumerateArray().Select(e => e.GetInt32()).ToArray();
+    private async Task<JsonElement[]> Search(string query, int topK)
+    {
+        var response = await CallTool(Guid.NewGuid().ToString(), "search_index", new Dictionary<string, object>
+        {
+            ["query"] = query,
+            ["category"] = Category,
+            ["topK"] = topK
+        });
+
+        response.Error.Should().BeNull();
+        return ToolPayload(response).GetProperty("results").EnumerateArray().ToArray();
+    }
+
+    private async Task<JsonElement[]> Retrieve(int[] ids)
+    {
+        var response = await CallTool(Guid.NewGuid().ToString(), "retrieve_search_results", new Dictionary<string, object>
+        {
+            ["ids"] = ids.Cast<object>().ToArray()
+        });
+
+        response.Error.Should().BeNull();
+        return ToolPayload(response).GetProperty("results").EnumerateArray().ToArray();
     }
 }

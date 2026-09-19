@@ -15,9 +15,6 @@ namespace StarForged_Claude_MCP.Embeddings
             services.AddSingleton<ISearchService, SearchService>();
             services.AddSingleton<EmbeddingsService>();
             services.AddSingleton<DbInterface>();
-            services.AddSingleton<VectorCacheService>();
-
-            services.AddHostedService(sp => sp.GetRequiredService<VectorCacheService>());
 
             return services;
         }

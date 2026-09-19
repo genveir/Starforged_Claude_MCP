@@ -1,4 +1,4 @@
-﻿using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
 namespace StarForged_Claude_MCP.Embeddings.Services
@@ -12,7 +12,9 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 
     public interface IDocumentProcessingService
     {
-        Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, string category, DocumentProcessorToUse processorToUse);
+        Task<int[]> IndexDocumentAsync(string documentText, int documentId, DocumentProcessorToUse processorToUse);
+
+        Task RemoveIndexForDocumentAsync(int documentId);
     }
 
     internal class DocumentProcessingService : IDocumentProcessingService
@@ -21,23 +23,25 @@ namespace StarForged_Claude_MCP.Embeddings.Services
         private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
         private readonly EmbeddingsService embeddingsService;
         private readonly DbInterface dbInterface;
-        private readonly VectorCacheService vectorCache;
 
         public DocumentProcessingService(
             MarkdownPreprocessor markdownPreprocessor,
             UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
             EmbeddingsService embeddingsService,
-            DbInterface dbInterface,
-            VectorCacheService vectorCache)
+            DbInterface dbInterface)
         {
             this.markdownPreprocessor = markdownPreprocessor;
             this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
             this.embeddingsService = embeddingsService;
             this.dbInterface = dbInterface;
-            this.vectorCache = vectorCache;
         }
 
-        public async Task<int[]> ProcessAndStoreDocumentAsync(string documentText, string sourceDocument, string category, DocumentProcessorToUse processorToUse)
+        /// <summary>
+        /// Replaces whatever is indexed for a document with chunks of the text given. Chunks are
+        /// owned by their document, so re-indexing is a delete and a rewrite; there is no dedup,
+        /// and duplicate text across documents simply produces duplicate chunks.
+        /// </summary>
+        public async Task<int[]> IndexDocumentAsync(string documentText, int documentId, DocumentProcessorToUse processorToUse)
         {
             var preprocessedText = processorToUse switch
             {
@@ -46,25 +50,20 @@ namespace StarForged_Claude_MCP.Embeddings.Services
                 _ => throw new ArgumentException("No processor available for this type of document, it cannot be stored.")
             };
 
+            await dbInterface.DeleteEmbeddingsForDocument(documentId);
+
             List<int> storedChunkIds = [];
 
             foreach (var chunk in preprocessedText.Chunks)
             {
                 var embedding = embeddingsService.GenerateEmbeddings(chunk);
-
-                var existingId = await vectorCache.FindExistingVector(embedding, category);
-                if (existingId.HasValue)
-                {
-                    storedChunkIds.Add(existingId.Value);
-                    continue;
-                }
-
-                var storedChunkId = await dbInterface.WriteEmbedding(chunk, embedding, sourceDocument, category);
-                await vectorCache.AddVector(storedChunkId, embedding, category);
-                storedChunkIds.Add(storedChunkId);
+                storedChunkIds.Add(await dbInterface.WriteEmbedding(chunk, embedding, documentId));
             }
 
             return [.. storedChunkIds];
         }
+
+        public async Task RemoveIndexForDocumentAsync(int documentId) =>
+            await dbInterface.DeleteEmbeddingsForDocument(documentId);
     }
 }

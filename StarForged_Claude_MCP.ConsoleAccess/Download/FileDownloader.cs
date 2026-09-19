@@ -13,11 +13,14 @@ public class FileDownloader
 
     public async Task DownloadFile(DownloadOptions options)
     {
-        var documents = await dbInterface.GetAllDocumentsForSourceDocument(options.SourceDocument, options.Category);
+        var document = await dbInterface.GetDocument(options.Category, options.Filename);
 
-        foreach (var document in documents)
+        if (document == null)
         {
-            Console.WriteLine(document.Content);
+            Console.Error.WriteLine($"No document named '{options.Filename}' exists in category '{options.Category}'.");
+            return;
         }
+
+        Console.WriteLine(document.Content);
     }
 }

@@ -4,7 +4,6 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Server.Services;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
@@ -51,9 +50,6 @@ public class TestFixture : IAsyncLifetime
         services.AddSingleton<IConfiguration>(configuration);
 
         Services = services.BuildServiceProvider();
-
-        var vectorCache = Services.GetRequiredService<VectorCacheService>();
-        await vectorCache.StartAsync(CancellationToken.None);
     }
 
     public async ValueTask DisposeAsync()

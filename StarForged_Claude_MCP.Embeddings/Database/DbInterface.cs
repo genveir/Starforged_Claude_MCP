@@ -16,13 +16,85 @@ public class DbInterface
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
     }
 
-    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, string sourceDocument, string category)
+    // ---------- Documents ----------
+
+    public async Task<int> StoreDocument(string category, string filename, string content, string? summary, bool indexed)
     {
         using var connection = new SqlConnection(_connectionString);
-        var id = await connection.QuerySingleAsync<int>(
-            "insert into Embeddings (Text, Vector, SourceDocument, TokenCount, Category) output inserted.Id values (@Text, @Vector, @SourceDocument, @TokenCount, @Category)",
-            new { Text = chunk.Text, Vector = FloatsToBytes(vector), SourceDocument = sourceDocument, TokenCount = chunk.Tokens.Length, Category = category });
-        return id;
+        return await connection.QuerySingleAsync<int>(
+            """
+            insert into Documents (Category, Filename, Content, Summary, Indexed)
+            output inserted.Id
+            values (@Category, @Filename, @Content, @Summary, @Indexed)
+            """,
+            new { Category = category, Filename = filename, Content = content, Summary = summary, Indexed = indexed });
+    }
+
+    public async Task<Document?> GetDocument(string category, string filename)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        return await connection.QuerySingleOrDefaultAsync<Document>(
+            "select Id, Category, Filename, Content, Summary, Indexed from Documents where Category = @Category and Filename = @Filename",
+            new { Category = category, Filename = filename });
+    }
+
+    /// <summary>The document's listing entry without its content, or null if it does not exist.</summary>
+    public async Task<DocumentIndexEntry?> GetDocumentSummary(string category, string filename)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        return await connection.QuerySingleOrDefaultAsync<DocumentIndexEntry>(
+            "select Filename, Summary, Indexed from Documents where Category = @Category and Filename = @Filename",
+            new { Category = category, Filename = filename });
+    }
+
+    public async Task<List<DocumentIndexEntry>> GetDocumentIndex(string category)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<DocumentIndexEntry>(
+            "select Filename, Summary, Indexed from Documents where Category = @Category order by Filename",
+            new { Category = category });
+        return results.ToList();
+    }
+
+    public async Task UpdateDocument(int id, string content, string? summary, bool indexed)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync(
+            "update Documents set Content = @Content, Summary = @Summary, Indexed = @Indexed where Id = @Id",
+            new { Id = id, Content = content, Summary = summary, Indexed = indexed });
+    }
+
+    /// <summary>Deletes the document and, by cascade, any chunks embedded from it.</summary>
+    public async Task DeleteDocument(int id)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Documents where Id = @Id", new { Id = id });
+    }
+
+    public async Task DeleteAllDocuments()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Documents");
+    }
+
+    // ---------- Embeddings ----------
+
+    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, int documentId)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        return await connection.QuerySingleAsync<int>(
+            """
+            insert into Embeddings (DocumentId, Text, Vector, TokenCount)
+            output inserted.Id
+            values (@DocumentId, @Text, @Vector, @TokenCount)
+            """,
+            new { DocumentId = documentId, Text = chunk.Text, Vector = FloatsToBytes(vector), TokenCount = chunk.Tokens.Length });
+    }
+
+    public async Task DeleteEmbeddingsForDocument(int documentId)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Embeddings where DocumentId = @DocumentId", new { DocumentId = documentId });
     }
 
     public async Task<List<TextResult>> GetEmbeddedTextByIds(int[] ids)
@@ -30,16 +102,37 @@ public class DbInterface
         if (ids.Length == 0) return [];
 
         using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
-            "select Id, Text, SourceDocument, Category from Embeddings where Id in @Ids",
+        var results = await connection.QueryAsync<TextResult>(
+            """
+            select e.Id, e.Text, d.Filename
+            from Embeddings e
+            join Documents d on d.Id = e.DocumentId
+            where e.Id in @Ids
+            """,
             new { Ids = ids });
+        return results.ToList();
+    }
 
-        return results.Select(r => new TextResult
+    /// <summary>
+    /// Every vector in a category. There is no cache: a category holds few enough rows that
+    /// reading them once per search costs nothing, and nothing can then go stale.
+    /// </summary>
+    internal async Task<List<VectorResult>> GetVectorsForCategory(string category)
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<dynamic>(
+            """
+            select e.Id, e.Vector
+            from Embeddings e
+            join Documents d on d.Id = e.DocumentId
+            where d.Category = @Category
+            """,
+            new { Category = category });
+
+        return results.Select(r => new VectorResult
         {
             Id = r.Id,
-            Text = r.Text,
-            SourceDocument = r.SourceDocument,
-            Category = r.Category
+            Vector = BytesToFloats((byte[])r.Vector)
         }).ToList();
     }
 
@@ -49,96 +142,56 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Embeddings");
     }
 
-    public async Task DeleteAllDocuments()
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Documents");
-    }
+    // ---------- Beats ----------
 
-    public async Task<int> StoreDocument(string content, string sourceDocument, string category, string? beatNumber = null, string? summary = null)
+    public async Task<int> StoreBeat(string category, int sessionNumber, int? beatNumber, int? version, string content)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleAsync<int>(
-            "insert into Documents (Content, SourceDocument, BeatNumber, Summary, Category) output inserted.Id values (@Content, @SourceDocument, @BeatNumber, @Summary, @Category)",
-            new { Content = content, SourceDocument = sourceDocument, BeatNumber = beatNumber, Summary = summary, Category = category });
-    }
-
-    public async Task DeleteDocumentById(int id)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Documents where Id = @Id", new { Id = id });
-    }
-
-    public async Task<List<DocumentResult>> GetAllDocumentsForSourceDocument(string sourceDocument, string category)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
-            "select Content, BeatNumber, Summary, Category from Documents where SourceDocument = @SourceDocument and Category = @Category order by Id",
-            new { SourceDocument = sourceDocument, Category = category });
-
-        int sequence = 1;
-        return results.Select(r => new DocumentResult
-        {
-            Content = r.Content,
-            Sequence = sequence++,
-            BeatNumber = (string?)r.BeatNumber,
-            Summary = (string?)r.Summary,
-            Category = (string)r.Category
-        }).ToList();
-    }
-
-    public async Task<List<DocumentIndexEntry>> GetDistinctSourceDocuments(string category)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
             """
-            with DistinctSummaries as (
-                select distinct SourceDocument, Summary
-                from Documents
-                where Summary is not null
-                and Category = @Category
-            )
-            select d.SourceDocument, string_agg(ds.Summary, ', ') as Summaries
-            from (select distinct SourceDocument from Documents where Category = @Category) d
-            left join DistinctSummaries ds on ds.SourceDocument = d.SourceDocument
-            group by d.SourceDocument
-            order by d.SourceDocument
+            insert into Beats (Category, SessionNumber, BeatNumber, Version, Content)
+            output inserted.Id
+            values (@Category, @SessionNumber, @BeatNumber, @Version, @Content)
             """,
-            new { Category = category });
-        return results.Select(r => new DocumentIndexEntry
-        {
-            SourceDocument = r.SourceDocument,
-            Summaries = (string?)r.Summaries
-        }).ToList();
+            new { Category = category, SessionNumber = sessionNumber, BeatNumber = beatNumber, Version = version, Content = content });
     }
 
-    public async Task<List<string?>> GetBeats(string sourceDocument)
+    /// <summary>
+    /// Every beat written for a session, in write order, superseded versions included.
+    /// Which of those are canonical is decided in code, not here.
+    /// </summary>
+    public async Task<List<Beat>> GetBeatsForSession(string category, int sessionNumber)
     {
         using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<string?>(
-            "select BeatNumber from Documents where SourceDocument = @SourceDocument order by Id",
-            new { SourceDocument = sourceDocument });
+        var results = await connection.QueryAsync<Beat>(
+            """
+            select Id, SessionNumber, BeatNumber, Version, Content
+            from Beats
+            where Category = @Category and SessionNumber = @SessionNumber
+            order by Id
+            """,
+            new { Category = category, SessionNumber = sessionNumber });
         return results.ToList();
     }
 
-    internal async Task<List<VectorResult>> GetAllVectors()
+    public async Task DeleteBeat(int id)
     {
         using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
-            "select Id, Vector, Category from Embeddings");
+        await connection.ExecuteAsync("delete from Beats where Id = @Id", new { Id = id });
+    }
 
-        return results.Select(r => new VectorResult
-        {
-            Id = r.Id,
-            Vector = BytesToFloats((byte[])r.Vector),
-            Category = r.Category
-        }).ToList();
+    public async Task DeleteAllBeats()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        await connection.ExecuteAsync("delete from Beats");
     }
 
     public async Task TestConnection()
     {
         using var connection = new SqlConnection(_connectionString);
-        await connection.QueryAsync<dynamic>("select top 0 Id, Text, Vector, SourceDocument, TokenCount, Category from Embeddings");
+        await connection.QueryAsync<dynamic>("select top 0 Id, Category, Filename, Content, Summary, Indexed from Documents");
+        await connection.QueryAsync<dynamic>("select top 0 Id, DocumentId, Text, Vector, TokenCount from Embeddings");
+        await connection.QueryAsync<dynamic>("select top 0 Id, Category, SessionNumber, BeatNumber, Version, Content from Beats");
     }
 
     private static byte[] FloatsToBytes(float[] floats)

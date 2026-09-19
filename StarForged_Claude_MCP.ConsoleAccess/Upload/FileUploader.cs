@@ -1,4 +1,5 @@
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
 using System.Collections.Concurrent;
 using System.Text;
@@ -10,15 +11,18 @@ public class FileUploader
     private readonly IDocumentProcessingService documentProcessingService;
     private readonly DbInterface dbInterface;
     private readonly BeatPreprocessor beatPreprocessor;
+    private readonly ISummaryPrompt summaryPrompt;
 
     public FileUploader(
         IDocumentProcessingService documentProcessingService,
         DbInterface dbInterface,
-        BeatPreprocessor beatPreprocessor)
+        BeatPreprocessor beatPreprocessor,
+        ISummaryPrompt summaryPrompt)
     {
         this.documentProcessingService = documentProcessingService;
         this.dbInterface = dbInterface;
         this.beatPreprocessor = beatPreprocessor;
+        this.summaryPrompt = summaryPrompt;
     }
 
     public async Task UploadFile(UploadOptions options, CancellationToken cancellationToken)
@@ -29,41 +33,133 @@ public class FileUploader
             return;
         }
 
-        if (options.Mode == UploadMode.Folder)
-            await UploadFolderAsync(options.FolderPath!, options.Sink, options.BeatLogging, options.Category);
-        else if (options.Mode == UploadMode.Continuous)
-            await RunContinuousAsync(options.SourceDocument!, options.Sink, options.BeatLogging, options.Category, cancellationToken);
-        else
+        switch (options.Mode)
         {
-            throw new ArgumentException($"Invalid upload mode {options.Mode.ToString()}");
+            case UploadMode.Folder:
+                await UploadFolderAsync(options.Category, options.FolderPath!, options.Indexed, options.Summaries);
+                break;
+            case UploadMode.Beats:
+                await RunBeatsAsync(options.Category, options.SessionNumber, cancellationToken);
+                break;
+            default:
+                throw new ArgumentException($"Invalid upload mode {options.Mode}");
         }
     }
 
-    private async Task UploadFolderAsync(string folderPath, SinkType sink, bool beatLogging, string? category)
+    private async Task UploadFolderAsync(string category, string folderPath, bool indexed, SummaryMode summaries)
     {
         var files = Directory.GetFiles(folderPath, "*.md", SearchOption.AllDirectories);
 
         Console.WriteLine($"Found {files.Length} file(s) to process.");
 
-        var totalCount = 0;
+        var stored = 0;
+        var replaced = 0;
 
         foreach (var filePath in files)
         {
             Console.WriteLine($"Processing: {filePath}");
 
             var text = await File.ReadAllTextAsync(filePath);
-            var fileName = Path.GetFileName(filePath);
+            var filename = Path.GetFileName(filePath);
 
-            var result = await RouteToSinkAsync(text, fileName, sink, beatLogging, category);
+            var existing = await dbInterface.GetDocument(category, filename);
 
-            Console.WriteLine(FormatResult(result, sink));
-            totalCount += result.Count;
+            // Asked for before anything is written, so that abandoning a run part way through
+            // never leaves a document stored without the summary that was being typed for it.
+            var summary = ResolveSummary(filename, existing?.Summary, summaries);
+
+            if (existing == null)
+            {
+                await StoreDocumentAsync(category, filename, text, summary, indexed);
+                Console.WriteLine(indexed ? "  Stored and indexed." : "  Stored.");
+                stored++;
+            }
+            else
+            {
+                await ReplaceDocumentAsync(existing, text, summary, indexed);
+                Console.WriteLine(indexed ? "  Replaced and reindexed." : "  Replaced.");
+                replaced++;
+            }
         }
 
-        Console.WriteLine($"\nCompleted! Total items uploaded: {totalCount}");
+        Console.WriteLine($"\nCompleted! {stored} document(s) stored, {replaced} replaced.");
     }
 
-    private async Task RunContinuousAsync(string sourceDocument, SinkType sink, bool beatLogging, string? category, CancellationToken cancellationToken)
+    private async Task RunBeatsAsync(string category, int sessionNumber, CancellationToken cancellationToken)
+    {
+        Console.WriteLine($"Listening on stdin. Category: {category}. Session: {sessionNumber}. Press Ctrl+C to exit.");
+        Console.WriteLine(await FormatLoggedBeatsAsync(category, sessionNumber));
+
+        await RunStdinLoopAsync(
+            store: async content =>
+            {
+                var (beatNumber, version, beatContent) = beatPreprocessor.Process(content);
+                var id = await dbInterface.StoreBeat(category, sessionNumber, beatNumber, version, beatContent);
+
+                var label = beatNumber == null ? "unnumbered" : $"{beatNumber}.{version}";
+                return (Id: id, Message: $"  Stored beat [{label}]\n{await FormatLoggedBeatsAsync(category, sessionNumber)}");
+            },
+            undo: async id =>
+            {
+                await dbInterface.DeleteBeat(id);
+                return $"  Undone: removed the last beat.\n{await FormatLoggedBeatsAsync(category, sessionNumber)}";
+            },
+            cancellationToken);
+    }
+
+    private string? ResolveSummary(string filename, string? existingSummary, SummaryMode summaries) => summaries switch
+    {
+        SummaryMode.All => summaryPrompt.Ask(filename, existingSummary),
+        SummaryMode.Missing => existingSummary ?? summaryPrompt.Ask(filename, existingSummary: null),
+        SummaryMode.None => existingSummary,
+        SummaryMode.Drop => null,
+        _ => throw new ArgumentException($"Unknown summary mode {summaries}", nameof(summaries))
+    };
+
+    private async Task<int> StoreDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
+    {
+        var id = await dbInterface.StoreDocument(category, filename, content, summary, indexed);
+
+        if (indexed)
+        {
+            await documentProcessingService.IndexDocumentAsync(content, id, DocumentProcessorToUse.Markdown);
+        }
+
+        return id;
+    }
+
+    /// <summary>Replaces a document already in the category, content and all.</summary>
+    private async Task ReplaceDocumentAsync(Document existing, string content, string? summary, bool indexed)
+    {
+        await dbInterface.UpdateDocument(existing.Id, content, summary, indexed);
+
+        if (indexed)
+        {
+            await documentProcessingService.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+        }
+        else
+        {
+            await documentProcessingService.RemoveIndexForDocumentAsync(existing.Id);
+        }
+    }
+
+    private async Task<string> FormatLoggedBeatsAsync(string category, int sessionNumber)
+    {
+        var beats = await dbInterface.GetBeatsForSession(category, sessionNumber);
+        var display = string.Join(", ", beats.Select(b => b.BeatNumber == null ? "None" : $"{b.BeatNumber}.{b.Version}"));
+        return $"Currently logged beats: [{display}]";
+    }
+
+    /// <summary>
+    /// Reads pasted text from stdin, flushing whatever arrived once it has been quiet for 100ms,
+    /// and hands each flush to <paramref name="store"/>. Ctrl+Z rolls back the last stored item
+    /// through <paramref name="undo"/>. This is the route beats are written by: it costs the GM
+    /// nothing in context, because the text is copied out of a response that was already there.
+    /// </summary>
+    private static async Task RunStdinLoopAsync(
+        Func<string, Task<(int Id, string Message)>> store,
+        Func<int, Task<string>> undo,
+        CancellationToken cancellationToken)
     {
         const string UndoSentinel = "\x1A";
 
@@ -122,17 +218,7 @@ public class FileUploader
 
         readerThread.Start();
 
-        Console.WriteLine($"Listening on stdin. Source: {sourceDocument}. Press Ctrl+C to exit.");
-
         var undoStack = new Stack<int>();
-
-        if (beatLogging)
-        {
-            var beats = await dbInterface.GetBeats(sourceDocument);
-            var beatDisplay = string.Join(", ", beats.Select(b => b ?? "None"));
-            Console.WriteLine($"Currently logged beats: [{beatDisplay}]");
-        }
-
         var buffer = new StringBuilder();
 
         try
@@ -147,74 +233,31 @@ public class FileUploader
                     while (lines.TryDequeue(out var line))
                     {
                         if (line == UndoSentinel)
-                            await HandleUndoAsync(undoStack, sourceDocument, beatLogging);
+                        {
+                            if (undoStack.Count == 0)
+                            {
+                                Console.WriteLine("  Nothing to undo.");
+                                continue;
+                            }
+                            Console.WriteLine(await undo(undoStack.Pop()));
+                        }
                         else
+                        {
                             buffer.AppendLine(line);
+                        }
                     }
                 }
                 else if (buffer.Length > 0)
                 {
                     var content = buffer.ToString();
                     buffer.Clear();
-                    var result = await RouteToSinkAsync(content, sourceDocument, sink, beatLogging, category);
-                    if (result.DocumentId.HasValue)
-                        undoStack.Push(result.DocumentId.Value);
-                    Console.WriteLine(FormatResult(result, sink));
+
+                    var (id, message) = await store(content);
+                    undoStack.Push(id);
+                    Console.WriteLine(message);
                 }
             }
         }
         catch (OperationCanceledException) { }
     }
-
-    private async Task HandleUndoAsync(Stack<int> undoStack, string sourceDocument, bool beatLogging)
-    {
-        if (undoStack.Count == 0)
-        {
-            Console.WriteLine("  Nothing to undo.");
-            return;
-        }
-        var id = undoStack.Pop();
-        await dbInterface.DeleteDocumentById(id);
-        Console.WriteLine("  Undone: removed last logged document.");
-
-        if (beatLogging)
-        {
-            var beats = await dbInterface.GetBeats(sourceDocument);
-            var beatDisplay = string.Join(", ", beats.Select(b => b ?? "None"));
-            Console.WriteLine($"Currently logged beats: [{beatDisplay}]");
-        }
-    }
-
-    private async Task<UploadResult> RouteToSinkAsync(string content, string sourceDocument, SinkType sink, bool beatLogging, string? category)
-    {
-        string? beatNumber = null;
-        if (beatLogging)
-        {
-            (beatNumber, content) = beatPreprocessor.Process(content);
-        }
-
-        // UploadOptions rejects a run without one, so this only fires on a programming error.
-        ArgumentException.ThrowIfNullOrWhiteSpace(category);
-
-        if (sink == SinkType.Embedded)
-        {
-            var ids = await documentProcessingService.ProcessAndStoreDocumentAsync(content, sourceDocument, category, DocumentProcessorToUse.Markdown);
-            return new UploadResult(ids.Length, ids);
-        }
-        else if (sink == SinkType.Document)
-        {
-            var id = await dbInterface.StoreDocument(content, sourceDocument, category, beatNumber);
-            return new UploadResult(1, [], beatNumber, id);
-        }
-        throw new ArgumentException("Invalid sink type.", nameof(sink));
-    }
-
-    private static string FormatResult(UploadResult result, SinkType sink) => sink switch
-    {
-        SinkType.Embedded => $"  Uploaded {result.Count} chunk(s) with IDs: {string.Join(", ", result.Ids)}",
-        SinkType.Document when result.BeatNumber != null => $"  Stored Document [{result.BeatNumber}]",
-        _ => "  Stored document."
-    };
-
-    private record UploadResult(int Count, int[] Ids, string? BeatNumber = null, int? DocumentId = null);
 }

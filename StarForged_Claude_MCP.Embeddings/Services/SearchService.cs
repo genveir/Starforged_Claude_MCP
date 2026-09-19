@@ -12,19 +12,16 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 
     internal class SearchService : ISearchService
     {
-        private readonly VectorCacheService vectorCache;
         private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
         private readonly EmbeddingsService embeddingsService;
         private readonly DbInterface dbInterface;
         private readonly ILogger<SearchService> logger;
 
-        public SearchService(VectorCacheService vectorCache,
-            UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
+        public SearchService(UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
             EmbeddingsService embeddingsService,
             DbInterface dbInterface,
             ILogger<SearchService> logger)
         {
-            this.vectorCache = vectorCache;
             this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
             this.embeddingsService = embeddingsService;
             this.dbInterface = dbInterface;
@@ -44,7 +41,8 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
 
             var results = similarityResults
-                .Join(textResults, sim => sim.Id, text => text.Id, (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id))
+                .Join(textResults, sim => sim.Id, text => text.Id,
+                    (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id, Filename: text.Filename))
                 .ToArray();
 
             return results;
@@ -56,12 +54,12 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 
             logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
 
-            var vectors = await vectorCache.GetAllVectors(category);
+            var vectors = await dbInterface.GetVectorsForCategory(category);
 
             logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
 
             var similarities = vectors
-                .Select(kvp => new { Id = kvp.Key, Similarity = CosineSimilarity(queryVector, kvp.Value) })
+                .Select(v => new { v.Id, Similarity = CosineSimilarity(queryVector, v.Vector) })
                 .OrderByDescending(x => x.Similarity)
                 .Take(topK)
                 .Select(x => new SimilarityResult(Id: x.Id, SimilarityScore: x.Similarity))

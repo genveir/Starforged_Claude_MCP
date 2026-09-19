@@ -7,7 +7,5 @@ public interface IEmbeddingsFacade
 {
     Task<SearchResult[]> SearchAsync(string query, string category, int topK = 3);
 
-    Task<int[]> AddMemoryAsync(string text, string sourceDocument, string category);
-
     Task<TextResult[]> RetrieveByIdsAsync(int[] ids);
 }

@@ -1,111 +1,91 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
-public class GetCanonicalBeatsTests(TestFixture fixture) : DocumentsTestBase(fixture)
+public class GetCanonicalBeatsTests(TestFixture fixture) : McpServerTestBase(fixture)
 {
+    private const string Category = "session_log";
+
     [Fact]
-    public async Task GetCanonicalBeats_ShouldReturnBeatsForSession()
+    public async Task GetCanonicalBeats_ShouldReturnLatestVersionsInNarrativeOrder()
     {
-        await ClearTestDocuments();
+        await ClearTestBeats();
 
-        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_5", "session_log");
-        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_5", "session_log", beatNumber: "1.0");
-        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_5", "session_log", beatNumber: "2.0");
-        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_5", "session_log", beatNumber: "2.1");
-        await AddTestDocument("Meanwhile, the rival adventuring party plotted in the shadows.", "SessionBeats_5", "session_log");
-        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_5", "session_log", beatNumber: "3.0");
+        await Db.StoreBeat(Category, sessionNumber: 5, beatNumber: null, version: null, content: "Prologue: a mysterious invitation.");
+        await Db.StoreBeat(Category, sessionNumber: 5, beatNumber: 1, version: 0, content: "The party arrived in Ironhaven.");
+        await Db.StoreBeat(Category, sessionNumber: 5, beatNumber: 2, version: 0, content: "The merchant was a spy.");
+        await Db.StoreBeat(Category, sessionNumber: 5, beatNumber: null, version: null, content: "Interlude: rivals plotted in the shadows.");
+        await Db.StoreBeat(Category, sessionNumber: 5, beatNumber: 3, version: 0, content: "A chase ended with an arrest.");
 
-        var request = new JsonRpcRequest
-        {
-            Id = "11",
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "get_canonical_beats",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "sessionNumber", 5 },
-                    { "category", "session_log" }
-                }
-            }
-        };
+        var beats = await GetBeats("1", sessionNumber: 5);
 
-        var response = await InvokeServerMethod(request);
+        beats.Select(b => b.GetProperty("content").GetString()).Should().Equal(
+            "Prologue: a mysterious invitation.",
+            "The party arrived in Ironhaven.",
+            "The merchant was a spy.",
+            "Interlude: rivals plotted in the shadows.",
+            "A chase ended with an arrest.");
 
-        response.Should().NotBeNull();
-        response.Id.Should().Be("11");
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions),
-            _jsonOptions);
-
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
-
-        documents.Should().HaveCount(5);
-        checkDocument(documents[0], "Prologue: the party received a mysterious invitation.", 1, null);
-        checkDocument(documents[1], "The party arrived in the city of Ironhaven.", 2, "1.0");
-        checkDocument(documents[2], "They discovered the butcher was a spy.", 3, "2.1");
-        checkDocument(documents[3], "Meanwhile, the rival adventuring party plotted in the shadows.", 4, null);
-        checkDocument(documents[4], "A chase through the market ended with an arrest.", 5, "3.0");
-
-        void checkDocument(JsonElement doc, string expectedContent, int expectedSequence, string? expectedBeatNumber)
-        {
-            doc.GetProperty("content").GetString().Should().Be(expectedContent);
-            doc.GetProperty("sequence").GetInt32().Should().Be(expectedSequence);
-            if (expectedBeatNumber == null)
-                doc.TryGetProperty("beatNumber", out _).Should().BeFalse();
-            else
-                doc.GetProperty("beatNumber").GetString().Should().Be(expectedBeatNumber);
-        }
+        beats.Select(b => b.GetProperty("sequence").GetInt32()).Should().Equal(1, 2, 3, 4, 5);
     }
 
     [Fact]
-    public async Task GetCanonicalBeats_WithCategoryFilter_ShouldReturnOnlyMatchingBeats()
+    public async Task GetCanonicalBeats_WhenABeatIsCorrectedLater_ShouldKeepItsOriginalPlace()
     {
-        await ClearTestDocuments();
+        await ClearTestBeats();
 
-        await AddTestDocument("Prologue: the party received a mysterious invitation.", "SessionBeats_6", "session_log");
-        await AddTestDocument("The party arrived in the city of Ironhaven.", "SessionBeats_6", "exploration", beatNumber: "1.0");
-        await AddTestDocument("They discovered the merchant was a spy.", "SessionBeats_6", "intrigue", beatNumber: "2.0");
-        await AddTestDocument("They discovered the butcher was a spy.", "SessionBeats_6", "intrigue", beatNumber: "2.1");
-        await AddTestDocument("A chase through the market ended with an arrest.", "SessionBeats_6", "exploration", beatNumber: "3.0");
+        await Db.StoreBeat(Category, sessionNumber: 6, beatNumber: 1, version: 0, content: "Beat one.");
+        await Db.StoreBeat(Category, sessionNumber: 6, beatNumber: 2, version: 0, content: "Beat two, as first written.");
+        await Db.StoreBeat(Category, sessionNumber: 6, beatNumber: null, version: null, content: "An interlude between two and three.");
+        await Db.StoreBeat(Category, sessionNumber: 6, beatNumber: 3, version: 0, content: "Beat three.");
+        await Db.StoreBeat(Category, sessionNumber: 6, beatNumber: 2, version: 1, content: "Beat two, corrected much later.");
 
-        var request = new JsonRpcRequest
+        var beats = await GetBeats("2", sessionNumber: 6);
+
+        beats.Select(b => b.GetProperty("content").GetString()).Should().Equal(
+            "Beat one.",
+            "Beat two, corrected much later.",
+            "An interlude between two and three.",
+            "Beat three.");
+
+        beats.Should().HaveCount(4, because: "the superseded version of beat two is not returned");
+    }
+
+    [Fact]
+    public async Task GetCanonicalBeats_ShouldOnlyReturnTheRequestedSessionAndCategory()
+    {
+        await ClearTestBeats();
+
+        await Db.StoreBeat(Category, sessionNumber: 7, beatNumber: 1, version: 0, content: "Session seven, this category.");
+        await Db.StoreBeat(Category, sessionNumber: 8, beatNumber: 1, version: 0, content: "Session eight, this category.");
+        await Db.StoreBeat("another_campaign", sessionNumber: 7, beatNumber: 1, version: 0, content: "Session seven, another category.");
+
+        var beats = await GetBeats("3", sessionNumber: 7);
+
+        beats.Should().HaveCount(1);
+        beats[0].GetProperty("content").GetString().Should().Be("Session seven, this category.");
+    }
+
+    [Fact]
+    public async Task GetCanonicalBeats_ForAnUnknownSession_ShouldReturnEmpty()
+    {
+        await ClearTestBeats();
+
+        var beats = await GetBeats("4", sessionNumber: 999);
+
+        beats.Should().BeEmpty();
+    }
+
+    private async Task<JsonElement[]> GetBeats(string id, int sessionNumber)
+    {
+        var response = await CallTool(id, "get_canonical_beats", new Dictionary<string, object>
         {
-            Id = "14",
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "get_canonical_beats",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "sessionNumber", 6 },
-                    { "category", "intrigue" }
-                }
-            }
-        };
+            ["category"] = Category,
+            ["sessionNumber"] = sessionNumber
+        });
 
-        var response = await InvokeServerMethod(request);
-
-        response.Should().NotBeNull();
-        response.Id.Should().Be("14");
         response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions),
-            _jsonOptions);
-
-        var toolResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var documents = toolResponse.GetProperty("documents").EnumerateArray().ToArray();
-
-        documents.Should().HaveCount(1);
-        documents[0].GetProperty("content").GetString().Should().Be("They discovered the butcher was a spy.");
-        documents[0].GetProperty("beatNumber").GetString().Should().Be("2.1");
-        documents[0].GetProperty("sequence").GetInt32().Should().Be(1);
+        return ToolPayload(response).GetProperty("beats").EnumerateArray().ToArray();
     }
 }

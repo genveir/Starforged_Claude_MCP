@@ -1,218 +1,167 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Server.Models;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
 public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
 {
+    private const string Category = "lore";
+
     [Fact]
     public async Task Search_WithValidQuery_ShouldReturnResults()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
-        await AddTestMemory("The wizard cast a powerful fireball spell.", "test_search");
-        await AddTestMemory("The rogue snuck past the guards silently.", "test_search");
+        await AddIndexedDocument("wizard.md", "The wizard cast a powerful fireball spell.");
+        await AddIndexedDocument("rogue.md", "The rogue snuck past the guards silently.");
 
-        var request = new JsonRpcRequest
-        {
-            Id = "4",
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "magic spells" },
-                    { "category", "lore" },
-                    { "topK", 2 }
-                }
-            }
-        };
+        var summaries = await SearchSummaries("magic spells", topK: 2);
 
-        var response = await InvokeServerMethod(request);
-
-        response.Should().NotBeNull();
-        response.Id.Should().Be("4");
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions),
-            _jsonOptions);
-
-        result.Should().NotBeNull();
-        result.Content.Should().NotBeNull();
-        result.Content.Should().HaveCount(1);
-
-        var content = result.Content[0];
-        content.Text.Should().NotBeNull();
-
-        var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
-        var results = searchResponse.GetProperty("results")
-            .EnumerateArray()
-            .Select(e => e.GetProperty("summary").GetString())
-            .ToArray();
-
-        results.Should().Contain("The wizard cast a powerful fireball spell.");
-        results.Should().Contain("The rogue snuck past the guards silently.");
+        summaries.Should().Contain("The wizard cast a powerful fireball spell.");
+        summaries.Should().Contain("The rogue snuck past the guards silently.");
     }
 
     [Fact]
     public async Task Search_SemanticRelevance_ShouldReturnTopTwoRelatedEntries()
     {
-        var sourceDoc = "test_semantic_relevance";
+        await ClearTestDocuments();
 
-        await ClearTestMemories();
+        await AddIndexedDocument("blacksmith.md", "The blacksmith hammered the glowing iron on the anvil.");
+        await AddIndexedDocument("baking.md", "She baked a sourdough loaf with rosemary and sea salt.");
+        await AddIndexedDocument("spacecraft.md", "The spacecraft entered orbit around the red planet.");
+        await AddIndexedDocument("fog.md", "A dense fog rolled over the mountain peaks at dawn.");
+        await AddIndexedDocument("chess.md", "The chess grandmaster sacrificed his queen to secure the endgame.");
 
-        await AddTestMemory("The blacksmith hammered the glowing iron on the anvil.", sourceDoc);
-        await AddTestMemory("She baked a sourdough loaf with rosemary and sea salt.", sourceDoc);
-        await AddTestMemory("The spacecraft entered orbit around the red planet.", sourceDoc);
-        await AddTestMemory("A dense fog rolled over the mountain peaks at dawn.", sourceDoc);
-        await AddTestMemory("The chess grandmaster sacrificed his queen to secure the endgame.", sourceDoc);
+        await AddIndexedDocument("reef.md", "The coral reef teems with colorful tropical fish and sea anemones.");
+        await AddIndexedDocument("dolphins.md", "Dolphins are highly intelligent marine mammals that live in the ocean.");
 
-        await AddTestMemory("The coral reef teems with colorful tropical fish and sea anemones.", sourceDoc);
-        await AddTestMemory("Dolphins are highly intelligent marine mammals that live in the ocean.", sourceDoc);
+        await AddIndexedDocument("lightning.md", "Lightning struck the old oak tree at the edge of the field.");
+        await AddIndexedDocument("orchestra.md", "The orchestra performed Beethoven's Fifth Symphony to a standing ovation.");
+        await AddIndexedDocument("debugging.md", "He debugged the memory leak by profiling heap allocations.");
+        await AddIndexedDocument("tax.md", "The tax reform bill passed through the senate with a narrow majority.");
+        await AddIndexedDocument("aqueducts.md", "Ancient Roman aqueducts supplied fresh water to cities across the empire.");
 
-        await AddTestMemory("Lightning struck the old oak tree at the edge of the field.", sourceDoc);
-        await AddTestMemory("The orchestra performed Beethoven's Fifth Symphony to a standing ovation.", sourceDoc);
-        await AddTestMemory("He debugged the memory leak by profiling heap allocations.", sourceDoc);
-        await AddTestMemory("The tax reform bill passed through the senate with a narrow majority.", sourceDoc);
-        await AddTestMemory("Ancient Roman aqueducts supplied fresh water to cities across the empire.", sourceDoc);
+        var summaries = await SearchSummaries("ocean wildlife and sea creatures", topK: 2);
 
-        var request = new JsonRpcRequest
-        {
-            Id = "7",
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "ocean wildlife and sea creatures" },
-                    { "category", "lore" },
-                    { "topK", 2 }
-                }
-            }
-        };
-
-        var response = await InvokeServerMethod(request);
-
-        response.Should().NotBeNull();
-        response.Id.Should().Be("7");
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions),
-            _jsonOptions);
-
-        result.Should().NotBeNull();
-        result.Content.Should().NotBeNull();
-        result.Content.Should().HaveCount(1);
-
-        var content = result.Content[0];
-        content.Text.Should().NotBeNull();
-
-        var searchResponse = JsonSerializer.Deserialize<JsonElement>(content.Text, _jsonOptions);
-        var results = searchResponse.GetProperty("results")
-            .EnumerateArray()
-            .Select(e => e.GetProperty("summary").GetString())
-            .ToArray();
-
-        results.Should().HaveCount(2);
-        results.Should().Contain("The coral reef teems with colorful tropical fish and sea anemones.");
-        results.Should().Contain("Dolphins are highly intelligent marine mammals that live in the ocean.");
+        summaries.Should().HaveCount(2);
+        summaries.Should().Contain("The coral reef teems with colorful tropical fish and sea anemones.");
+        summaries.Should().Contain("Dolphins are highly intelligent marine mammals that live in the ocean.");
     }
 
     [Fact]
     public async Task Search_ShouldOnlyConsiderTheRequestedCategory()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
-        await AddTestMemory("The ancient dragon guarded its hoard deep beneath the mountain.", "test_scoping", category: "session_log");
+        await AddIndexedDocument("dragon.md", "The ancient dragon guarded its hoard deep beneath the mountain.", category: "session_log");
 
-        var makeRequest = (string id, string category) => new JsonRpcRequest
-        {
-            Id = id,
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "sleeping dragon" },
-                    { "category", category },
-                    { "topK", 5 }
-                }
-            }
-        };
+        var otherCategory = await SearchResults("sleeping dragon", topK: 5, category: "lore");
+        var ownCategory = await SearchResults("sleeping dragon", topK: 5, category: "session_log");
 
-        JsonElement[] ResultsOf(JsonRpcResponse response)
-        {
-            response.Error.Should().BeNull();
-            var result = JsonSerializer.Deserialize<CallToolResult>(
-                JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-            return JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions)
-                .GetProperty("results").EnumerateArray().ToArray();
-        }
-
-        var otherCategory = ResultsOf(await InvokeServerMethod(makeRequest("20", "lore")));
-        var ownCategory = ResultsOf(await InvokeServerMethod(makeRequest("21", "session_log")));
-
-        otherCategory.Should().BeEmpty(because: "the only matching chunk was stored under a different category");
+        otherCategory.Should().BeEmpty(because: "the only matching document lives in a different category");
         ownCategory.Should().HaveCount(1);
     }
 
-    private async Task AddTestMemory(string text, string sourceDocument, string category = "lore")
+    [Fact]
+    public async Task Search_ShouldNotFindDocumentsStoredWithoutIndexing()
     {
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "add_memory",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "text", text },
-                    { "sourceDocument", sourceDocument },
-                    { "category", category }
-                }
-            }
-        };
+        await ClearTestDocuments();
 
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
+        await CallTool("30", "add_document", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "unindexed.md",
+            ["text"] = "The ancient dragon guarded its hoard deep beneath the mountain.",
+            ["indexed"] = false
+        });
+
+        var results = await SearchResults("sleeping dragon", topK: 5);
+
+        results.Should().BeEmpty(because: "a document stored with indexed=false is never chunked or embedded");
+    }
+
+    [Fact]
+    public async Task Search_ShouldReturnTheFilenameOfTheDocumentAChunkCameFrom()
+    {
+        await ClearTestDocuments();
+
+        await AddIndexedDocument("dragon_lore.md", "The ancient dragon guarded its hoard deep beneath the mountain.");
+
+        var results = await SearchResults("dragon hoard", topK: 1);
+
+        results.Should().ContainSingle();
+        results[0].GetProperty("filename").GetString().Should().Be("dragon_lore.md");
+    }
+
+    [Fact]
+    public async Task Search_AfterUpdate_ShouldFindTheNewContentAndNotTheOld()
+    {
+        await ClearTestDocuments();
+
+        await AddIndexedDocument("changeable.md", "The coral reef teems with colorful tropical fish.");
+
+        await CallTool("31", "update_document", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "changeable.md",
+            ["text"] = "The blacksmith hammered the glowing iron on the anvil.",
+            ["indexed"] = true
+        });
+
+        var summaries = await SearchSummaries("coral reef tropical fish", topK: 5);
+
+        summaries.Should().NotContain("The coral reef teems with colorful tropical fish.",
+            because: "an update replaces the content outright, so the old chunks are discarded");
+        summaries.Should().Contain("The blacksmith hammered the glowing iron on the anvil.");
+    }
+
+    [Fact]
+    public async Task Search_AfterIndexingIsTurnedOff_ShouldFindNothing()
+    {
+        await ClearTestDocuments();
+
+        await AddIndexedDocument("withdrawn.md", "The coral reef teems with colorful tropical fish.");
+
+        await CallTool("32", "update_document", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "withdrawn.md",
+            ["text"] = "The coral reef teems with colorful tropical fish.",
+            ["indexed"] = false
+        });
+
+        var results = await SearchResults("coral reef tropical fish", topK: 5);
+
+        results.Should().BeEmpty(because: "updating with indexed=false removes what was indexed for the document");
+    }
+
+    [Fact]
+    public async Task Search_AfterTheDocumentIsDeleted_ShouldFindNothing()
+    {
+        await ClearTestDocuments();
+
+        await AddIndexedDocument("temporary.md", "The coral reef teems with colorful tropical fish.");
+
+        await CallTool("33", "delete_document", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "temporary.md"
+        });
+
+        var results = await SearchResults("coral reef tropical fish", topK: 5);
+
+        results.Should().BeEmpty(because: "the foreign key cascades, so a deleted document takes its chunks with it");
     }
 
     [Fact]
     public async Task SearchIndex_ShortFirstSentence_ShouldReturnFirstTwoSentences()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
-        var fullText = "The dragon slept. It had guarded its vast golden hoard for centuries. No one had ever dared disturb it.";
-        await AddTestMemory(fullText, "test_summary_short");
+        await AddIndexedDocument("short_first.md",
+            "The dragon slept. It had guarded its vast golden hoard for centuries. No one had ever dared disturb it.");
 
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "sleeping dragon" },
-                    { "category", "lore" },
-                    { "topK", 1 }
-                }
-            }
-        };
-
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var searchResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var summary = searchResponse.GetProperty("results").EnumerateArray().First().GetProperty("summary").GetString();
+        var summary = (await SearchSummaries("sleeping dragon", topK: 1)).Single();
 
         summary.Should().Be("The dragon slept. It had guarded its vast golden hoard for centuries.");
         summary.Should().NotContain("No one had ever dared disturb it.");
@@ -221,33 +170,12 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
     [Fact]
     public async Task SearchIndex_LongFirstSentence_ShouldReturnFirstSentenceOnly()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
-        var fullText = "The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.";
-        await AddTestMemory(fullText, "test_summary_long");
+        await AddIndexedDocument("long_first.md",
+            "The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.");
 
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "dragon guarding hoard" },
-                    { "category", "lore" },
-                    { "topK", 1 }
-                }
-            }
-        };
-
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var searchResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var summary = searchResponse.GetProperty("results").EnumerateArray().First().GetProperty("summary").GetString();
+        var summary = (await SearchSummaries("dragon guarding hoard", topK: 1)).Single();
 
         summary.Should().Be("The ancient dragon had guarded its vast golden hoard for centuries.");
         summary.Should().NotContain("No one had ever dared disturb it.");
@@ -256,35 +184,58 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
     [Fact]
     public async Task SearchIndex_BreadcrumbText_ShouldPreservePrefixInSummary()
     {
-        await ClearTestMemories();
+        await ClearTestDocuments();
 
-        var fullText = "Dragon's Lair: The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.";
-        await AddTestMemory(fullText, "test_summary_breadcrumb");
+        await AddIndexedDocument("breadcrumb.md",
+            "Dragon's Lair: The ancient dragon had guarded its vast golden hoard for centuries. No one had ever dared disturb it.");
 
-        var request = new JsonRpcRequest
-        {
-            Method = "tools/call",
-            Params = new CallToolParams
-            {
-                Name = "search_index",
-                Arguments = new Dictionary<string, object>
-                {
-                    { "query", "dragon lair hoard" },
-                    { "category", "lore" },
-                    { "topK", 1 }
-                }
-            }
-        };
-
-        var response = await InvokeServerMethod(request);
-        response.Error.Should().BeNull();
-
-        var result = JsonSerializer.Deserialize<CallToolResult>(
-            JsonSerializer.Serialize(response.Result, _jsonOptions), _jsonOptions);
-        var searchResponse = JsonSerializer.Deserialize<JsonElement>(result!.Content[0].Text, _jsonOptions);
-        var summary = searchResponse.GetProperty("results").EnumerateArray().First().GetProperty("summary").GetString();
+        var summary = (await SearchSummaries("dragon lair hoard", topK: 1)).Single();
 
         summary.Should().Be("Dragon's Lair: The ancient dragon had guarded its vast golden hoard for centuries.");
         summary.Should().NotContain("No one had ever dared disturb it.");
     }
+
+    [Fact]
+    public async Task Search_WithoutCategory_ShouldReturnError()
+    {
+        var response = await CallTool("34", "search_index", new Dictionary<string, object>
+        {
+            ["query"] = "anything at all"
+        });
+
+        response.Error.Should().NotBeNull();
+        response.Error.Code.Should().Be(-32602);
+        response.Error.Message.Should().Contain("Category cannot be empty");
+    }
+
+    private async Task AddIndexedDocument(string filename, string text, string category = Category)
+    {
+        var response = await CallTool(Guid.NewGuid().ToString(), "add_document", new Dictionary<string, object>
+        {
+            ["category"] = category,
+            ["filename"] = filename,
+            ["text"] = text,
+            ["indexed"] = true
+        });
+
+        response.Error.Should().BeNull();
+    }
+
+    private async Task<JsonElement[]> SearchResults(string query, int topK, string category = Category)
+    {
+        var response = await CallTool(Guid.NewGuid().ToString(), "search_index", new Dictionary<string, object>
+        {
+            ["query"] = query,
+            ["category"] = category,
+            ["topK"] = topK
+        });
+
+        response.Error.Should().BeNull();
+        return ToolPayload(response).GetProperty("results").EnumerateArray().ToArray();
+    }
+
+    private async Task<string[]> SearchSummaries(string query, int topK, string category = Category) =>
+        (await SearchResults(query, topK, category))
+            .Select(r => r.GetProperty("summary").GetString()!)
+            .ToArray();
 }
