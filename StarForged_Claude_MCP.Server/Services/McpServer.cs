@@ -143,9 +143,9 @@ public class McpServer
                         text = new { type = "string", description = "The content to store" },
                         sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
                         summary = new { type = "string", description = "Optional short summary of this document, surfaced in document_index" },
-                        category = new { type = "string", description = "Optional category label, can be used to filter results in get_documents" }
+                        category = new { type = "string", description = "Category label, can be used to filter results in get_documents" }
                     },
-                    required = new[] { "text", "sourceDocument" }
+                    required = new[] { "text", "sourceDocument", "category" }
                 }
             },
             new()
@@ -158,9 +158,9 @@ public class McpServer
                     properties = new
                     {
                         sourceDocument = new { type = "string", description = "Category or identifier (e.g., 'campaign_session_5')" },
-                        category = new { type = "string", description = "Optional category filter; when provided only documents with a matching category are returned" }
+                        category = new { type = "string", description = "Category filter; only documents with a matching category are returned" }
                     },
-                    required = new[] { "sourceDocument" }
+                    required = new[] { "sourceDocument", "category" }
                 }
             },
             new()
@@ -186,8 +186,9 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Optional category filter; when provided only sourceDocuments containing documents with a matching category are returned" }
-                    }
+                        category = new { type = "string", description = "Category filter; only sourceDocuments containing documents with a matching category are returned" }
+                    },
+                    required = new[] { "category" }
                 }
             },
             new()
@@ -210,9 +211,9 @@ public class McpServer
                     properties = new
                     {
                         sessionNumber = new { type = "number", description = "The session number to retrieve beats for" },
-                        category = new { type = "string", description = "Optional category filter; when provided only beats with a matching category are returned" }
+                        category = new { type = "string", description = "Category filter; only beats with a matching category are returned" }
                     },
-                    required = new[] { "sessionNumber" }
+                    required = new[] { "sessionNumber", "category" }
                 }
             }
         };
