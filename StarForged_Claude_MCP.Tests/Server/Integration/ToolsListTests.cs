@@ -28,7 +28,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         result.Should().NotBeNull();
         result.Tools.Should().NotBeNull();
-        result.Tools.Should().HaveCount(7);
+        result.Tools.Should().HaveCount(8);
         result.Tools.Should().Contain(t => t.Name == "search_index");
         result.Tools.Should().Contain(t => t.Name == "add_searchable");
         result.Tools.Should().Contain(t => t.Name == "add_document");
@@ -36,5 +36,6 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
         result.Tools.Should().Contain(t => t.Name == "get_canonical_beats");
         result.Tools.Should().Contain(t => t.Name == "retrieve_search_results");
         result.Tools.Should().Contain(t => t.Name == "document_index");
+        result.Tools.Should().Contain(t => t.Name == "roll_dice");
     }
 }

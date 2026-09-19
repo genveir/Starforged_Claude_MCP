@@ -192,6 +192,16 @@ public class McpServer
             },
             new()
             {
+                Name = "roll_dice",
+                Description = "Rolls the dice for an Ironsworn action roll: one d6 (action die) and two d10s (challenge dice). Returns the results as integers.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new { }
+                }
+            },
+            new()
+            {
                 Name = "get_canonical_beats",
                 Description = "Retrieves the canonical beats for a given session in the order they were added. Stored documents are full GM responses; beats are embedded within them alongside mechanical confirmations and conversational content.",
                 InputSchema = new
@@ -221,7 +231,7 @@ public class McpServer
             var paramsJson = JsonSerializer.Serialize(request.Params, _jsonOptions);
             var callParams = JsonSerializer.Deserialize<CallToolParams>(paramsJson, _jsonOptions);
 
-            if (callParams == null || callParams.Arguments == null)
+            if (callParams == null)
             {
                 return new JsonRpcResponse
                 {
@@ -230,7 +240,7 @@ public class McpServer
                 };
             }
 
-            var resultText = await ExecuteToolAsync(callParams.Name, callParams.Arguments);
+            var resultText = await ExecuteToolAsync(callParams.Name, callParams.Arguments ?? new Dictionary<string, object>());
 
             _logger.LogInformation("Tool '{ToolName}' executed successfully", callParams.Name);
 
@@ -286,6 +296,7 @@ public class McpServer
             "get_documents" => await ExecuteGetDocumentsAsync(arguments),
             "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
             "document_index" => await ExecuteDocumentIndexAsync(arguments),
+            "roll_dice" => ExecuteRollDice(),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
         };
     }
@@ -424,6 +435,15 @@ public class McpServer
         var documents = FilterCanonicalBeats(allDocuments);
         _logger.LogDebug("get_canonical_beats returned {DocumentCount} document(s) for sessionNumber={SessionNumber}", documents.Count, sessionNumber);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
+    }
+
+    private string ExecuteRollDice()
+    {
+        var actionDie = Random.Shared.Next(1, 7);
+        var challengeDice = new[] { Random.Shared.Next(1, 11), Random.Shared.Next(1, 11) };
+
+        _logger.LogDebug("Executing roll_dice: actionDie={ActionDie}, challengeDice={ChallengeDice}", actionDie, string.Join(",", challengeDice));
+        return JsonSerializer.Serialize(new { actionDie, challengeDice }, _jsonOptions);
     }
 
     private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
