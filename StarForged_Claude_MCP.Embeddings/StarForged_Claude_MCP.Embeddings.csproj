@@ -24,6 +24,10 @@
 		</ItemGroup>
 
 	<ItemGroup>
+		<EmbeddedResource Include="Database\CreateScript.sql" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<InternalsVisibleTo Include="StarForged_Claude_MCP.Tests" />
 	</ItemGroup>
 

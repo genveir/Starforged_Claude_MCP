@@ -3,6 +3,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings;
+using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Server.Services;
 
@@ -31,6 +32,9 @@ public class TestFixture : IAsyncLifetime
             InitialCatalog = "master"
         }.ConnectionString;
 
+        // A run that aborts before DisposeAsync leaves the test database behind; dropping
+        // first guarantees the schema below is what the tests actually run against.
+        await DropDatabase();
         await CreateDatabase(masterConnectionString, _databaseName);
         await CreateTable(_connectionString);
 
@@ -86,31 +90,10 @@ public class TestFixture : IAsyncLifetime
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync();
 
-        var createTableSql = @"
-            if not exists (select * from sys.tables where name = 'Embeddings')
-            begin
-                create table Embeddings
-                (
-                    Id int identity(1,1) primary key,
-                    Text nvarchar(max) not null,
-                    Vector varbinary(max) not null,
-                    SourceDocument nvarchar(500) not null,
-                    TokenCount int not null
-                )
-            end
-
-            if not exists (select * from sys.tables where name = 'Documents')
-            begin
-                create table Documents
-                (
-                    Id int identity(1,1) primary key,
-                    SourceDocument nvarchar(500) not null,
-                    Content nvarchar(max) not null,
-                    BeatNumber nvarchar(20) null
-                )
-            end";
-
-        await connection.ExecuteAsync(createTableSql);
+        foreach (var batch in DatabaseSchema.GetTableCreationBatches())
+        {
+            await connection.ExecuteAsync(batch);
+        }
     }
 
     private async Task DropDatabase()
