@@ -39,7 +39,7 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents) =>
                 embeddings.Verify(f => f.RetrieveByIdsAsync(It.Is<int[]>(ids => ids.SequenceEqual(new[] { 7, 11 }))), Times.Once)),
 
-        ["add_searchable"] = new ToolCase(
+        ["add_memory"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["text"] = Text, ["sourceDocument"] = SourceDocument },
             VerifyDispatch: (embeddings, documents) =>
                 embeddings.Verify(f => f.AddMemoryAsync(Text, SourceDocument), Times.Once)),

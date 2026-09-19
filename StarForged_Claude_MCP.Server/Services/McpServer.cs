@@ -118,7 +118,7 @@ public class McpServer
             },
             new()
             {
-                Name = "add_searchable",
+                Name = "add_memory",
                 Description = "Chunks and stores text and makes it searchable",
                 InputSchema = new
                 {
@@ -376,9 +376,9 @@ public class McpServer
             throw new ArgumentException("SourceDocument exceeds maximum length of 500 characters");
         }
 
-        _logger.LogDebug("Executing add_searchable: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
+        _logger.LogDebug("Executing add_memory: sourceDocument={SourceDocument}, textLength={TextLength}", sourceDocument, text.Length);
         var id = await _embeddings.AddMemoryAsync(text, sourceDocument);
-        _logger.LogDebug("add_searchable stored {ChunkCount} chunk(s) for sourceDocument={SourceDocument}", id.Length, sourceDocument);
+        _logger.LogDebug("add_memory stored {ChunkCount} chunk(s) for sourceDocument={SourceDocument}", id.Length, sourceDocument);
         return JsonSerializer.Serialize(new { message = "Memory stored successfully", Id = id }, _jsonOptions);
     }
 

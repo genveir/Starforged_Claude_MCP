@@ -30,7 +30,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
         result.Tools.Should().NotBeNull();
         result.Tools.Should().HaveCount(8);
         result.Tools.Should().Contain(t => t.Name == "search_index");
-        result.Tools.Should().Contain(t => t.Name == "add_searchable");
+        result.Tools.Should().Contain(t => t.Name == "add_memory");
         result.Tools.Should().Contain(t => t.Name == "add_document");
         result.Tools.Should().Contain(t => t.Name == "get_documents");
         result.Tools.Should().Contain(t => t.Name == "get_canonical_beats");
