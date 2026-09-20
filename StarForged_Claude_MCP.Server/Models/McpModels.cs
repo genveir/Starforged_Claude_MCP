@@ -81,6 +81,14 @@ public class CallToolResult
 {
     [JsonPropertyName("content")]
     public List<ToolContent> Content { get; set; } = new();
+
+    /// <summary>
+    /// A tool that ran and refused reports it here rather than as a JSON-RPC error. Protocol errors
+    /// describe a call the server could not make sense of, and clients are free to render their own
+    /// text for those, which leaves the model with nothing to act on; an error result reaches it.
+    /// </summary>
+    [JsonPropertyName("isError")]
+    public bool IsError { get; set; }
 }
 
 public class ToolContent

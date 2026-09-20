@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
@@ -40,7 +40,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "C"),
             ("text", Lines("## C", "", "rewritten C"))));
 
-        replaced.Error.Should().BeNull();
+        replaced.ShouldHaveSucceeded();
 
         (await ReadContent("3")).Should().Be(Lines(
             "# B",
@@ -66,7 +66,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "D"),
             ("text", Lines("### D", "", "rewritten D"))));
 
-        replaced.Error.Should().BeNull();
+        replaced.ShouldHaveSucceeded();
 
         (await ReadContent("6")).Should().Be(Lines(
             "# B",
@@ -95,7 +95,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "E"),
             ("text", Lines("## F", "", "text F"))));
 
-        replaced.Error.Should().BeNull();
+        replaced.ShouldHaveSucceeded();
         (await ReadContent("9")).Should().EndWith(Lines("## F", "", "text F"));
     }
 
@@ -108,9 +108,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "C"),
             ("text", "just the prose, no header")));
 
-        replaced.Error.Should().NotBeNull();
-        replaced.Error.Code.Should().Be(-32602);
-        replaced.Error.Message.Should().Contain("## C",
+        replaced.ShouldHaveBeenRefused().Should().Contain("## C",
             because: "the error has to show the header line the replacement was missing");
 
         (await ReadContent("12")).Should().Be(Nested, because: "a refused edit must not have written anything");
@@ -125,8 +123,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "D"),
             ("text", Lines("## D", "", "promoted without asking"))));
 
-        replaced.Error.Should().NotBeNull();
-        replaced.Error.Message.Should().Contain("### D");
+        replaced.ShouldHaveBeenRefused().Should().Contain("### D");
     }
 
     [Fact]
@@ -138,8 +135,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "D"),
             ("text", Lines("### D", "", "text D", "", "# A new top level", "", "which would restructure the file"))));
 
-        replaced.Error.Should().NotBeNull();
-        replaced.Error.Message.Should().Contain("would end the section");
+        replaced.ShouldHaveBeenRefused().Should().Contain("would end the section");
 
         (await ReadContent("17")).Should().Be(Nested);
     }
@@ -153,7 +149,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "d"),
             ("text", Lines("### D", "", "rewritten D"))));
 
-        replaced.Error.Should().BeNull();
+        replaced.ShouldHaveSucceeded();
         (await ReadContent("20")).Should().Contain("rewritten D");
     }
 
@@ -166,9 +162,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "Nowhere"),
             ("text", Lines("## Nowhere", "", "text"))));
 
-        replaced.Error.Should().NotBeNull();
-        replaced.Error.Code.Should().Be(-32602);
-        replaced.Error.Message.Should().Contain("B > C > D").And.Contain("B > E",
+        replaced.ShouldHaveBeenRefused().Should().Contain("B > C > D").And.Contain("B > E",
             because: "listing the sections is what lets a model correct itself without refetching the document");
     }
 
@@ -195,14 +189,13 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "Rites"),
             ("text", Lines("### Rites", "", "rewritten"))));
 
-        ambiguous.Error.Should().NotBeNull();
-        ambiguous.Error.Message.Should().Contain("Customs > Ironlander > Rites").And.Contain("Customs > Outlander > Rites");
+        ambiguous.ShouldHaveBeenRefused().Should().Contain("Customs > Ironlander > Rites").And.Contain("Customs > Outlander > Rites");
 
         var qualified = await CallTool("25", "replace_document_section", Arguments(
             ("section", "Outlander > Rites"),
             ("text", Lines("### Rites", "", "rewritten"))));
 
-        qualified.Error.Should().BeNull();
+        qualified.ShouldHaveSucceeded();
 
         var content = await ReadContent("26");
         content.Should().Contain("Ironlander rites.", because: "only the qualified section should have changed");
@@ -218,7 +211,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "C"),
             ("text", Lines("### G", "", "text G"))));
 
-        appended.Error.Should().BeNull();
+        appended.ShouldHaveSucceeded();
 
         (await ReadContent("29")).Should().Be(Lines(
             "# B",
@@ -251,7 +244,7 @@ public class SectionEditingTests : McpServerTestBase
         var appended = await CallTool("31", "append_to_document", Arguments(
             ("text", Lines("## H", "", "text H"))));
 
-        appended.Error.Should().BeNull();
+        appended.ShouldHaveSucceeded();
         (await ReadContent("32")).Should().Be(Nested + "\n\n" + Lines("## H", "", "text H"));
     }
 
@@ -262,7 +255,7 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("60", "append_to_document", Arguments(
             ("section", "C"),
-            ("text", Lines("", "### G", "", "text G", ""))))).Error.Should().BeNull();
+            ("text", Lines("", "### G", "", "text G", ""))))).ShouldHaveSucceeded();
 
         (await ReadContent("61")).Should().NotContain("\n\n\n",
             because: "blank lines the text arrives with would otherwise sit on top of the one the seam adds");
@@ -277,8 +270,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "C"),
             ("text", Lines("## Not nested", "", "this would sit outside C"))));
 
-        appended.Error.Should().NotBeNull();
-        appended.Error.Message.Should().Contain("would end the section");
+        appended.ShouldHaveBeenRefused().Should().Contain("would end the section");
 
         (await ReadContent("35")).Should().Be(Nested);
     }
@@ -290,7 +282,7 @@ public class SectionEditingTests : McpServerTestBase
 
         var deleted = await CallTool("37", "delete_document_section", Arguments(("section", "C")));
 
-        deleted.Error.Should().BeNull();
+        deleted.ShouldHaveSucceeded();
 
         (await ReadContent("38")).Should().Be(Lines(
             "# B",
@@ -308,7 +300,7 @@ public class SectionEditingTests : McpServerTestBase
     {
         await StoreNestedDocument("39");
 
-        (await CallTool("40", "delete_document_section", Arguments(("section", "E")))).Error.Should().BeNull();
+        (await CallTool("40", "delete_document_section", Arguments(("section", "E")))).ShouldHaveSucceeded();
 
         (await ReadContent("41")).Should().Be(Lines(
             "# B",
@@ -337,9 +329,7 @@ public class SectionEditingTests : McpServerTestBase
             ["text"] = "## C"
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("No document named");
+        response.ShouldHaveBeenRefused().Should().Contain("No document named");
     }
 
     [Fact]
@@ -350,7 +340,7 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("44", "replace_document_section", Arguments(
             ("section", "E"),
-            ("text", Lines("## E", "", "rewritten E"))))).Error.Should().BeNull();
+            ("text", Lines("## E", "", "rewritten E"))))).ShouldHaveSucceeded();
 
         (await Db.GetDocument(Category, Filename))!.Summary.Should().Be("The summary it was stored with",
             because: "an edit to one section says nothing about the document's summary");
@@ -364,13 +354,13 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("46", "append_to_document", Arguments(
             ("text", "A closing line."),
-            ("summary", "A newer summary")))).Error.Should().BeNull();
+            ("summary", "A newer summary")))).ShouldHaveSucceeded();
 
         (await Db.GetDocument(Category, Filename))!.Summary.Should().Be("A newer summary");
 
         (await CallTool("47", "append_to_document", Arguments(
             ("text", "Another closing line."),
-            ("summary", "")))).Error.Should().BeNull();
+            ("summary", "")))).ShouldHaveSucceeded();
 
         (await Db.GetDocument(Category, Filename))!.Summary.Should().BeNull(
             because: "an empty summary is how a write asks for the stored one to go");
@@ -387,7 +377,7 @@ public class SectionEditingTests : McpServerTestBase
             ["category"] = Category,
             ["filename"] = Filename,
             ["text"] = Lines("# B", "", "an entirely new body")
-        })).Error.Should().BeNull();
+        })).ShouldHaveSucceeded();
 
         var document = await Db.GetDocument(Category, Filename);
         document!.Content.Should().Be(Lines("# B", "", "an entirely new body"));
@@ -402,7 +392,7 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("51", "replace_document_section", Arguments(
             ("section", "E"),
-            ("text", Lines("## E", "", "A luminous derelict hangs above the shattered moon."))))).Error.Should().BeNull();
+            ("text", Lines("## E", "", "A luminous derelict hangs above the shattered moon."))))).ShouldHaveSucceeded();
 
         (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
 
@@ -422,7 +412,7 @@ public class SectionEditingTests : McpServerTestBase
         await ClearTestDocuments();
         await StoreDocument("53", Nested, indexed: false);
 
-        (await CallTool("54", "append_to_document", Arguments(("text", "A closing line.")))).Error.Should().BeNull();
+        (await CallTool("54", "append_to_document", Arguments(("text", "A closing line.")))).ShouldHaveSucceeded();
 
         (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeFalse(
             because: "editing a document is not a decision to start indexing it");
@@ -434,13 +424,13 @@ public class SectionEditingTests : McpServerTestBase
         await ClearTestDocuments();
         await StoreDocument("55", Nested, indexed: false);
 
-        (await CallTool("56", "index_document", Arguments())).Error.Should().BeNull();
+        (await CallTool("56", "index_document", Arguments())).ShouldHaveSucceeded();
 
         var indexed = await Db.GetDocument(Category, Filename);
         indexed!.Indexed.Should().BeTrue();
         indexed.Content.Should().Be(Nested);
 
-        (await CallTool("57", "deindex_document", Arguments())).Error.Should().BeNull();
+        (await CallTool("57", "deindex_document", Arguments())).ShouldHaveSucceeded();
 
         var deindexed = await Db.GetDocument(Category, Filename);
         deindexed!.Indexed.Should().BeFalse();
@@ -458,9 +448,7 @@ public class SectionEditingTests : McpServerTestBase
             ["filename"] = "never_stored.md"
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("No document named");
+        response.ShouldHaveBeenRefused().Should().Contain("No document named");
     }
 
     private static string Lines(params string[] lines) => string.Join("\n", lines);
@@ -497,7 +485,7 @@ public class SectionEditingTests : McpServerTestBase
 
         if (summary != null) arguments["summary"] = summary;
 
-        (await CallTool(id, "add_document", arguments)).Error.Should().BeNull();
+        (await CallTool(id, "add_document", arguments)).ShouldHaveSucceeded();
     }
 
     private async Task<string> ReadContent(string id)
@@ -508,7 +496,7 @@ public class SectionEditingTests : McpServerTestBase
             ["filename"] = Filename
         });
 
-        fetched.Error.Should().BeNull();
+        fetched.ShouldHaveSucceeded();
         return ToolPayload(fetched).GetProperty("document").GetProperty("content").GetString()!;
     }
 }

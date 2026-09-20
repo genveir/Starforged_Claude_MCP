@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
@@ -73,9 +73,7 @@ public class RetrieveSearchResultsTests : McpServerTestBase
             ["ids"] = Array.Empty<object>()
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("cannot be empty");
+        response.ShouldHaveBeenRefused().Should().Contain("cannot be empty");
     }
 
     private async Task AddIndexedDocument(string filename, string text)
@@ -88,7 +86,7 @@ public class RetrieveSearchResultsTests : McpServerTestBase
             ["indexed"] = true
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
     }
 
     private async Task<JsonElement[]> Search(string query, int topK)
@@ -100,7 +98,7 @@ public class RetrieveSearchResultsTests : McpServerTestBase
             ["topK"] = topK
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         return ToolPayload(response).GetProperty("results").EnumerateArray().ToArray();
     }
 
@@ -111,7 +109,7 @@ public class RetrieveSearchResultsTests : McpServerTestBase
             ["ids"] = ids.Cast<object>().ToArray()
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         return ToolPayload(response).GetProperty("results").EnumerateArray().ToArray();
     }
 }

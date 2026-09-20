@@ -24,7 +24,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         });
 
-        added.Error.Should().BeNull();
+        added.ShouldHaveSucceeded();
 
         var fetched = await CallTool("2", "get_document", new Dictionary<string, object>
         {
@@ -32,7 +32,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "tavern.md"
         });
 
-        fetched.Error.Should().BeNull();
+        fetched.ShouldHaveSucceeded();
 
         var document = ToolPayload(fetched).GetProperty("document");
         document.GetProperty("filename").GetString().Should().Be("tavern.md");
@@ -55,13 +55,11 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         };
 
-        (await CallTool("3", "add_document", arguments())).Error.Should().BeNull();
+        (await CallTool("3", "add_document", arguments())).ShouldHaveSucceeded();
 
         var second = await CallTool("4", "add_document", arguments());
 
-        second.Error.Should().NotBeNull();
-        second.Error.Code.Should().Be(-32602);
-        second.Error.Message.Should().Contain("already exists");
+        second.ShouldHaveBeenRefused().Should().Contain("already exists");
     }
 
     [Fact]
@@ -77,8 +75,8 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         };
 
-        (await CallTool("5", "add_document", makeArguments("lore"))).Error.Should().BeNull();
-        (await CallTool("6", "add_document", makeArguments("session_log"))).Error.Should().BeNull();
+        (await CallTool("5", "add_document", makeArguments("lore"))).ShouldHaveSucceeded();
+        (await CallTool("6", "add_document", makeArguments("session_log"))).ShouldHaveSucceeded();
 
         var fetched = await CallTool("7", "get_document", new Dictionary<string, object>
         {
@@ -112,7 +110,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["summary"] = "New summary"
         });
 
-        updated.Error.Should().BeNull();
+        updated.ShouldHaveSucceeded();
 
         var fetched = await CallTool("10", "get_document", new Dictionary<string, object>
         {
@@ -137,9 +135,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["text"] = "Nothing to replace."
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("No document named");
+        response.ShouldHaveBeenRefused().Should().Contain("No document named");
     }
 
     [Fact]
@@ -159,7 +155,7 @@ public class DocumentCrudTests : McpServerTestBase
         {
             ["category"] = Category,
             ["filename"] = "doomed.md"
-        })).Error.Should().BeNull();
+        })).ShouldHaveSucceeded();
 
         var fetched = await CallTool("14", "get_document", new Dictionary<string, object>
         {
@@ -167,8 +163,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "doomed.md"
         });
 
-        fetched.Error.Should().NotBeNull();
-        fetched.Error.Message.Should().Contain("No document named");
+        fetched.ShouldHaveBeenRefused().Should().Contain("No document named");
     }
 
     [Fact]
@@ -182,8 +177,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "never_stored.md"
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
+        response.ShouldHaveBeenRefused();
     }
 
     [Fact]
@@ -219,7 +213,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["category"] = Category
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
 
         var documents = ToolPayload(response).GetProperty("documents").EnumerateArray().ToArray();
 
@@ -252,7 +246,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "summarised.md"
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
 
         var payload = ToolPayload(response);
         payload.GetProperty("filename").GetString().Should().Be("summarised.md");
@@ -274,7 +268,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "from_the_console.md"
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
 
         var payload = ToolPayload(response);
         payload.TryGetProperty("summary", out var summary).Should().BeTrue(
@@ -293,9 +287,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["filename"] = "never_stored.md"
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("No document named");
+        response.ShouldHaveBeenRefused().Should().Contain("No document named");
     }
 
     [Fact]
@@ -334,9 +326,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("read-only");
+        response.ShouldHaveBeenRefused().Should().Contain("read-only");
 
         (await Db.GetDocument("sealed_vault", "forbidden.md")).Should().BeNull();
     }
@@ -349,7 +339,7 @@ public class DocumentCrudTests : McpServerTestBase
         (await CallTool("28", "request_write_permission", new Dictionary<string, object>
         {
             ["category"] = "unsealed_vault"
-        })).Error.Should().BeNull();
+        })).ShouldHaveSucceeded();
 
         var added = await CallTool("29", "add_document", new Dictionary<string, object>
         {
@@ -359,7 +349,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         });
 
-        added.Error.Should().BeNull();
+        added.ShouldHaveSucceeded();
         (await Db.GetDocument("unsealed_vault", "permitted.md")).Should().NotBeNull();
     }
 
@@ -373,9 +363,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("Category cannot be empty");
+        response.ShouldHaveBeenRefused().Should().Contain("Category cannot be empty");
     }
 
     [Fact]
@@ -388,8 +376,6 @@ public class DocumentCrudTests : McpServerTestBase
             ["text"] = "No indexing decision given."
         });
 
-        response.Error.Should().NotBeNull();
-        response.Error.Code.Should().Be(-32602);
-        response.Error.Message.Should().Contain("Indexed is required");
+        response.ShouldHaveBeenRefused().Should().Contain("Indexed is required");
     }
 }

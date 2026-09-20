@@ -414,14 +414,21 @@ public class McpServer
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning("Tool call argument error: {Message}", ex.Message);
+            // The tool ran and refused, which is something the caller can do something about: which
+            // section names exist, that the category is still read-only. That has to travel in the
+            // result, because a JSON-RPC error reaches the client as a protocol failure and the model
+            // is shown whatever generic wording the client keeps for those.
+            _logger.LogWarning("Tool call refused: {Message}", ex.Message);
             return new JsonRpcResponse
             {
                 Id = request.Id,
-                Error = new JsonRpcError
+                Result = new CallToolResult
                 {
-                    Code = -32602,
-                    Message = ex.Message
+                    IsError = true,
+                    Content = new List<ToolContent>
+                    {
+                        new() { Text = ex.Message }
+                    }
                 }
             };
         }
@@ -471,10 +478,7 @@ public class McpServer
         var query = RequireString(arguments, "Query", maxLength: 10_000);
         var category = RequireCategory(arguments);
 
-        var topK = arguments.ContainsKey("topK")
-            ? (arguments["topK"] is JsonElement je ? je.GetInt32() : Convert.ToInt32(arguments["topK"]))
-            : 3;
-        topK = Math.Min(topK, 10);
+        var topK = Math.Min(OptionalInt(arguments, "topK", defaultValue: 3), 10);
 
         _logger.LogDebug("Executing search: category={Category}, query length={QueryLength}, topK={TopK}", category, query.Length, topK);
         var results = await _embeddings.SearchAsync(query, category, topK);
@@ -492,15 +496,7 @@ public class McpServer
 
     private async Task<string> ExecuteRetrieveSearchResultsAsync(Dictionary<string, object> arguments)
     {
-        int[] ids;
-        if (arguments["ids"] is JsonElement je)
-        {
-            ids = je.EnumerateArray().Select(e => e.GetInt32()).ToArray();
-        }
-        else
-        {
-            ids = ((IEnumerable<object>)arguments["ids"]).Select(e => Convert.ToInt32(e)).ToArray();
-        }
+        var ids = RequireIntArray(arguments, "ids");
 
         if (ids.Length == 0)
             throw new ArgumentException("Ids cannot be empty");
@@ -699,9 +695,7 @@ public class McpServer
     private async Task<string> ExecuteGetCanonicalBeatsAsync(Dictionary<string, object> arguments)
     {
         var category = RequireCategory(arguments);
-        var sessionNumber = arguments["sessionNumber"] is JsonElement je
-            ? je.GetInt32()
-            : Convert.ToInt32(arguments["sessionNumber"]);
+        var sessionNumber = RequireInt(arguments, "sessionNumber");
 
         _logger.LogDebug("Executing get_canonical_beats: category={Category}, sessionNumber={SessionNumber}", category, sessionNumber);
         var beats = await _documents.GetCanonicalBeatsAsync(category, sessionNumber);
@@ -754,11 +748,79 @@ public class McpServer
 
     private static int OptionalInt(Dictionary<string, object> arguments, string key, int defaultValue)
     {
-        if (!arguments.TryGetValue(key, out var raw) || raw == null)
+        if (!arguments.TryGetValue(key, out var raw) || raw == null || raw is JsonElement { ValueKind: JsonValueKind.Null })
             return defaultValue;
 
-        return raw is JsonElement je ? je.GetInt32() : Convert.ToInt32(raw);
+        return ReadInt(raw, DisplayName(key));
     }
+
+    private static int RequireInt(Dictionary<string, object> arguments, string key) =>
+        ReadInt(RequirePresent(arguments, key), DisplayName(key));
+
+    private static int[] RequireIntArray(Dictionary<string, object> arguments, string key)
+    {
+        var raw = RequirePresent(arguments, key);
+        var entries = $"{DisplayName(key)} entries";
+
+        if (raw is JsonElement je)
+        {
+            if (je.ValueKind != JsonValueKind.Array)
+                throw WrongType(DisplayName(key), Describe(je), expected: "a list of whole numbers");
+
+            return [.. je.EnumerateArray().Select(element => ReadInt(element, entries))];
+        }
+
+        if (raw is not IEnumerable<object> values)
+            throw WrongType(DisplayName(key), found: "a single value", expected: "a list of whole numbers");
+
+        return [.. values.Select(value => ReadInt(value, entries))];
+    }
+
+    /// <summary>
+    /// Argument problems are told to the caller in the same terms as any other refusal, rather than
+    /// surfacing as an unhandled conversion failure: a caller that sent "3" for a number learns that
+    /// much and can send 3, where a generic failure leaves it nothing to go on.
+    /// </summary>
+    private static int ReadInt(object raw, string name)
+    {
+        const string expected = "a whole number, written as a number rather than in quotes";
+
+        if (raw is JsonElement je)
+        {
+            if (je.ValueKind != JsonValueKind.Number || !je.TryGetInt32(out var value))
+                throw WrongType(name, Describe(je), expected);
+
+            return value;
+        }
+
+        if (raw is string text)
+            throw WrongType(name, $"the text \"{text}\"", expected);
+
+        return Convert.ToInt32(raw);
+    }
+
+    private static object RequirePresent(Dictionary<string, object> arguments, string key)
+    {
+        if (!arguments.TryGetValue(key, out var raw) || raw == null || raw is JsonElement { ValueKind: JsonValueKind.Null })
+            throw new ArgumentException($"{DisplayName(key)} is required");
+
+        return raw;
+    }
+
+    private static ArgumentException WrongType(string name, string found, string expected) =>
+        new($"{name} has to be {expected}, but {found} was sent.");
+
+    private static string Describe(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.String => $"the text \"{element.GetString()}\"",
+        JsonValueKind.True or JsonValueKind.False => "a true/false value",
+        JsonValueKind.Array => "a list",
+        JsonValueKind.Object => "an object",
+        JsonValueKind.Number => "a number that is not whole",
+        _ => "nothing"
+    };
+
+    private static string DisplayName(string key) => char.ToUpperInvariant(key[0]) + key[1..];
 
     private static string RequireCategory(Dictionary<string, object> arguments) =>
         RequireString(arguments, "Category", maxLength: 200);
@@ -778,10 +840,21 @@ public class McpServer
 
     private static bool RequireBool(Dictionary<string, object> arguments, string key)
     {
-        if (!arguments.TryGetValue(key, out var raw) || raw == null)
-            throw new ArgumentException($"{char.ToUpperInvariant(key[0]) + key[1..]} is required");
+        var raw = RequirePresent(arguments, key);
+        const string expected = "true or false, written without quotes";
 
-        return raw is JsonElement je ? je.GetBoolean() : Convert.ToBoolean(raw);
+        if (raw is JsonElement je)
+        {
+            if (je.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw WrongType(DisplayName(key), Describe(je), expected);
+
+            return je.GetBoolean();
+        }
+
+        if (raw is string text)
+            throw WrongType(DisplayName(key), $"the text \"{text}\"", expected);
+
+        return Convert.ToBoolean(raw);
     }
 
     private static string? OptionalString(Dictionary<string, object> arguments, string key, int maxLength)
@@ -789,7 +862,7 @@ public class McpServer
         var value = ReadOptional(arguments, key);
 
         if (value != null && value.Length > maxLength)
-            throw new ArgumentException($"{char.ToUpperInvariant(key[0]) + key[1..]} exceeds maximum length of {maxLength:N0} characters");
+            throw new ArgumentException($"{DisplayName(key)} exceeds maximum length of {maxLength:N0} characters");
 
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }

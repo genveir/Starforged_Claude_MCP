@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
@@ -85,7 +85,7 @@ public class GetCanonicalBeatsTests(TestFixture fixture) : McpServerTestBase(fix
             ["sessionNumber"] = sessionNumber
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         return ToolPayload(response).GetProperty("beats").EnumerateArray().ToArray();
     }
 }

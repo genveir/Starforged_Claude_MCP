@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
@@ -97,8 +97,7 @@ public class WritePermissionToolTests
 
         var response = await CallToolAsync(server, toolName, arguments);
 
-        response.Error.Should().NotBeNull();
-        response.Error!.Message.Should().Contain("read-only").And.Contain("request_write_permission");
+        response.ShouldHaveBeenRefused().Should().Contain("read-only").And.Contain("request_write_permission");
         documents.VerifyNoOtherCalls();
     }
 
@@ -111,11 +110,11 @@ public class WritePermissionToolTests
         var server = CreateServer(documents, new WritePermissions());
 
         var granted = await CallToolAsync(server, "request_write_permission", new Dictionary<string, object> { ["category"] = Category });
-        granted.Error.Should().BeNull();
+        granted.ShouldHaveSucceeded();
 
         var response = await CallToolAsync(server, toolName, arguments);
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         documents.Invocations.Should().NotBeEmpty(because: "'{0}' should run once writes are permitted", toolName);
     }
 
@@ -129,11 +128,11 @@ public class WritePermissionToolTests
 
         await CallToolAsync(server, "request_write_permission", new Dictionary<string, object> { ["category"] = Category });
         var revoked = await CallToolAsync(server, "release_write_permission", new Dictionary<string, object> { ["category"] = Category });
-        revoked.Error.Should().BeNull();
+        revoked.ShouldHaveSucceeded();
 
         var response = await CallToolAsync(server, toolName, arguments);
 
-        response.Error.Should().NotBeNull();
+        response.ShouldHaveBeenRefused();
         documents.VerifyNoOtherCalls();
     }
 
@@ -153,7 +152,8 @@ public class WritePermissionToolTests
             ["indexed"] = false
         });
 
-        response.Error.Should().NotBeNull(because: "permission is granted per category, not server-wide");
+        response.ShouldHaveBeenRefused().Should().Contain("read-only",
+            because: "permission is granted per category, not server-wide");
         documents.VerifyNoOtherCalls();
     }
 
@@ -173,7 +173,7 @@ public class WritePermissionToolTests
             ["indexed"] = false
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
     }
 
     [Fact]
@@ -183,7 +183,7 @@ public class WritePermissionToolTests
 
         var response = await CallToolAsync(server, "release_write_permission", new Dictionary<string, object> { ["category"] = Category });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
     }
 
     [Fact]
@@ -194,7 +194,7 @@ public class WritePermissionToolTests
 
         var response = await CallToolAsync(server, "document_index", new Dictionary<string, object> { ["category"] = Category });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once);
     }
 

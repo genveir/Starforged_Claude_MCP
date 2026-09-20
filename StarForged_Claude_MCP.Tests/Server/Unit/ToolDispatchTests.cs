@@ -217,10 +217,9 @@ public class ToolDispatchTests
             }
         });
 
-        response.Error.Should().BeNull(
+        response.ShouldHaveSucceeded(
             because: "'{0}' is advertised by tools/list, so calling it by that name must resolve to a handler",
             toolName);
-        response.Result.Should().BeOfType<CallToolResult>();
 
         toolCase.VerifyDispatch(embeddings, documents, permissions);
     }

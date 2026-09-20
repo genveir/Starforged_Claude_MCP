@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -62,7 +62,7 @@ public class RollDiceToolTests
             Params = new CallToolParams { Name = "roll_dice", Arguments = arguments }
         });
 
-        response.Error.Should().BeNull();
+        response.ShouldHaveSucceeded();
         var text = ((CallToolResult)response.Result!).Content.Single().Text;
 
         return JsonSerializer.Deserialize<JsonElement>(text);
