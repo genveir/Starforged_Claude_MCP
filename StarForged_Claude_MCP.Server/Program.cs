@@ -48,6 +48,11 @@ public class Program
 
         builder.Services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
         builder.Services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
+        builder.Services.AddSingleton<IDiceRoller>(_ => new DiceRoller(
+            actionDie: new Die(sides: 6),
+            firstChallengeDie: new Die(sides: 10),
+            secondChallengeDie: new Die(sides: 10)));
+        builder.Services.AddSingleton<IWritePermissions, WritePermissions>();
         builder.Services.AddSingleton<McpServer>();
 
         var host = builder.Build();

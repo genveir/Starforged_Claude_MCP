@@ -12,7 +12,7 @@ public class ToolDispatchTests
 {
     private sealed record ToolCase(
         Dictionary<string, object> Arguments,
-        Action<Mock<IEmbeddingsFacade>, Mock<IDocumentsFacade>> VerifyDispatch);
+        Action<Mock<IEmbeddingsFacade>, Mock<IDocumentsFacade>, Mock<IWritePermissions>> VerifyDispatch);
 
     private const string Category = "lore";
     private const string Filename = "derelict.md";
@@ -31,12 +31,12 @@ public class ToolDispatchTests
                 ["query"] = "derelict in the Forge",
                 ["category"] = Category
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 embeddings.Verify(f => f.SearchAsync("derelict in the Forge", Category, 3), Times.Once)),
 
         ["retrieve_search_results"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["ids"] = new object[] { 7, 11 } },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 embeddings.Verify(f => f.RetrieveByIdsAsync(It.Is<int[]>(ids => ids.SequenceEqual(new[] { 7, 11 }))), Times.Once)),
 
         ["add_document"] = new ToolCase(
@@ -48,7 +48,7 @@ public class ToolDispatchTests
                 ["summary"] = Summary,
                 ["indexed"] = true
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.AddDocumentAsync(Category, Filename, Text, Summary, true), Times.Once)),
 
         ["update_document"] = new ToolCase(
@@ -60,16 +60,16 @@ public class ToolDispatchTests
                 ["summary"] = Summary,
                 ["indexed"] = false
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.UpdateDocumentAsync(Category, Filename, Text, Summary, false), Times.Once)),
 
-        ["delete_document"] = new ToolCase(
+        ["archive_document"] = new ToolCase(
             Arguments: new Dictionary<string, object>
             {
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.DeleteDocumentAsync(Category, Filename), Times.Once)),
 
         ["get_document"] = new ToolCase(
@@ -78,7 +78,7 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentAsync(Category, Filename), Times.Once)),
 
         ["get_document_summary"] = new ToolCase(
@@ -87,12 +87,12 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentSummaryAsync(Category, Filename), Times.Once)),
 
         ["document_index"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once)),
 
         ["get_canonical_beats"] = new ToolCase(
@@ -101,16 +101,26 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["sessionNumber"] = 5
             },
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetCanonicalBeatsAsync(Category, 5), Times.Once)),
 
         ["roll_dice"] = new ToolCase(
             Arguments: new Dictionary<string, object>(),
-            VerifyDispatch: (embeddings, documents) =>
+            VerifyDispatch: (embeddings, documents, permissions) =>
             {
                 embeddings.VerifyNoOtherCalls();
                 documents.VerifyNoOtherCalls();
-            })
+            }),
+
+        ["request_write_permission"] = new ToolCase(
+            Arguments: new Dictionary<string, object> { ["category"] = Category },
+            VerifyDispatch: (embeddings, documents, permissions) =>
+                permissions.Verify(p => p.EnableWrite(Category), Times.Once)),
+
+        ["release_write_permission"] = new ToolCase(
+            Arguments: new Dictionary<string, object> { ["category"] = Category },
+            VerifyDispatch: (embeddings, documents, permissions) =>
+                permissions.Verify(p => p.DisableWrite(Category), Times.Once))
     };
 
     public static TheoryData<string> AdvertisedToolNames
@@ -142,7 +152,8 @@ public class ToolDispatchTests
 
         var embeddings = CreateEmbeddingsMock();
         var documents = CreateDocumentsMock();
-        var server = new McpServer(embeddings.Object, documents.Object, NullLogger<McpServer>.Instance);
+        var permissions = CreateWritePermissionsMock();
+        var server = new McpServer(embeddings.Object, documents.Object, CreateDiceRoller(), permissions.Object, NullLogger<McpServer>.Instance);
 
         var response = await McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
         {
@@ -160,7 +171,7 @@ public class ToolDispatchTests
             toolName);
         response.Result.Should().BeOfType<CallToolResult>();
 
-        toolCase.VerifyDispatch(embeddings, documents);
+        toolCase.VerifyDispatch(embeddings, documents, permissions);
     }
 
     private static List<string> ListAdvertisedToolNames()
@@ -168,6 +179,8 @@ public class ToolDispatchTests
         var server = new McpServer(
             CreateEmbeddingsMock().Object,
             CreateDocumentsMock().Object,
+            CreateDiceRoller(),
+            CreateWritePermissionsMock().Object,
             NullLogger<McpServer>.Instance);
 
         var response = McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
@@ -179,6 +192,22 @@ public class ToolDispatchTests
 
         var result = (ToolsListResult)response.Result!;
         return result.Tools.Select(t => t.Name).ToList();
+    }
+
+    private static IDiceRoller CreateDiceRoller() => new DiceRoller(
+        actionDie: new Die(sides: 6),
+        firstChallengeDie: new Die(sides: 10),
+        secondChallengeDie: new Die(sides: 10));
+
+    private static Mock<IWritePermissions> CreateWritePermissionsMock()
+    {
+        var mock = new Mock<IWritePermissions>(MockBehavior.Strict);
+
+        mock.Setup(p => p.IsWriteEnabled(It.IsAny<string>())).Returns(true);
+        mock.Setup(p => p.EnableWrite(It.IsAny<string>()));
+        mock.Setup(p => p.DisableWrite(It.IsAny<string>()));
+
+        return mock;
     }
 
     private static Mock<IEmbeddingsFacade> CreateEmbeddingsMock()

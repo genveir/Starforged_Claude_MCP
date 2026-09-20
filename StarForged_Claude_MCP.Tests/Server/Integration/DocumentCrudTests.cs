@@ -3,9 +3,12 @@ using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
-public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
+public class DocumentCrudTests : McpServerTestBase
 {
     private const string Category = "lore";
+
+    public DocumentCrudTests(TestFixture fixture) : base(fixture) =>
+        PermitWritesIn(Category, "session_log", "other_category");
 
     [Fact]
     public async Task AddDocument_ShouldRoundTripThroughGetDocument()
@@ -142,7 +145,7 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task DeleteDocument_ShouldRemoveIt()
+    public async Task ArchiveDocument_ShouldRemoveIt()
     {
         await ClearTestDocuments();
 
@@ -154,7 +157,7 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
             ["indexed"] = false
         });
 
-        (await CallTool("13", "delete_document", new Dictionary<string, object>
+        (await CallTool("13", "archive_document", new Dictionary<string, object>
         {
             ["category"] = Category,
             ["filename"] = "doomed.md"
@@ -171,11 +174,11 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task DeleteDocument_WhenMissing_ShouldReturnError()
+    public async Task ArchiveDocument_WhenMissing_ShouldReturnError()
     {
         await ClearTestDocuments();
 
-        var response = await CallTool("15", "delete_document", new Dictionary<string, object>
+        var response = await CallTool("15", "archive_document", new Dictionary<string, object>
         {
             ["category"] = Category,
             ["filename"] = "never_stored.md"
@@ -318,6 +321,48 @@ public class DocumentCrudTests(TestFixture fixture) : McpServerTestBase(fixture)
         (await Db.GetDocument(Category, "derived.md"))!.Indexed.Should().BeFalse();
         (await Db.GetDocumentSummary(Category, "derived.md"))!.Indexed.Should().BeFalse();
         (await Db.GetDocumentIndex(Category)).Single().Indexed.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task AddDocument_InACategoryThatIsStillReadOnly_ShouldReturnErrorAndStoreNothing()
+    {
+        await ClearTestDocuments();
+
+        var response = await CallTool("27", "add_document", new Dictionary<string, object>
+        {
+            ["category"] = "sealed_vault",
+            ["filename"] = "forbidden.md",
+            ["text"] = "This should never be stored.",
+            ["indexed"] = false
+        });
+
+        response.Error.Should().NotBeNull();
+        response.Error.Code.Should().Be(-32602);
+        response.Error.Message.Should().Contain("read-only");
+
+        (await Db.GetDocument("sealed_vault", "forbidden.md")).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task AddDocument_AfterRequestWritePermissionForItsCategory_ShouldStoreTheDocument()
+    {
+        await ClearTestDocuments();
+
+        (await CallTool("28", "request_write_permission", new Dictionary<string, object>
+        {
+            ["category"] = "unsealed_vault"
+        })).Error.Should().BeNull();
+
+        var added = await CallTool("29", "add_document", new Dictionary<string, object>
+        {
+            ["category"] = "unsealed_vault",
+            ["filename"] = "permitted.md",
+            ["text"] = "This one is allowed.",
+            ["indexed"] = false
+        });
+
+        added.Error.Should().BeNull();
+        (await Db.GetDocument("unsealed_vault", "permitted.md")).Should().NotBeNull();
     }
 
     [Fact]

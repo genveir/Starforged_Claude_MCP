@@ -25,6 +25,13 @@ public abstract class McpServerTestBase
 
     protected DbInterface Db => _fixture.Services.GetRequiredService<DbInterface>();
 
+    protected void PermitWritesIn(params string[] categories)
+    {
+        var permissions = _fixture.Services.GetRequiredService<IWritePermissions>();
+        foreach (var category in categories)
+            permissions.EnableWrite(category);
+    }
+
     protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>
         await McpServerInvoker.HandleRequestAsync(_server, request);
 

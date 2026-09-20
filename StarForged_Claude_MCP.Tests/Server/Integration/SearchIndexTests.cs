@@ -3,9 +3,12 @@ using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
-public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
+public class SearchIndexTests : McpServerTestBase
 {
     private const string Category = "lore";
+
+    public SearchIndexTests(TestFixture fixture) : base(fixture) =>
+        PermitWritesIn(Category, "session_log");
 
     [Fact]
     public async Task Search_WithValidQuery_ShouldReturnResults()
@@ -136,13 +139,13 @@ public class SearchIndexTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task Search_AfterTheDocumentIsDeleted_ShouldFindNothing()
+    public async Task Search_AfterTheDocumentIsArchived_ShouldFindNothing()
     {
         await ClearTestDocuments();
 
         await AddIndexedDocument("temporary.md", "The coral reef teems with colorful tropical fish.");
 
-        await CallTool("33", "delete_document", new Dictionary<string, object>
+        await CallTool("33", "archive_document", new Dictionary<string, object>
         {
             ["category"] = Category,
             ["filename"] = "temporary.md"

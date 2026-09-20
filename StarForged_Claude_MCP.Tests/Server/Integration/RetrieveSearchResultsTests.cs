@@ -3,9 +3,12 @@ using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
-public class RetrieveSearchResultsTests(TestFixture fixture) : McpServerTestBase(fixture)
+public class RetrieveSearchResultsTests : McpServerTestBase
 {
     private const string Category = "lore";
+
+    public RetrieveSearchResultsTests(TestFixture fixture) : base(fixture) =>
+        PermitWritesIn(Category);
 
     [Fact]
     public async Task SearchThenRetrieve_EndToEnd_ShouldYieldFullText()

@@ -32,12 +32,14 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "retrieve_search_results",
             "add_document",
             "update_document",
-            "delete_document",
+            "archive_document",
             "get_document",
             "get_document_summary",
             "document_index",
             "get_canonical_beats",
-            "roll_dice");
+            "roll_dice",
+            "request_write_permission",
+            "release_write_permission");
     }
 
     [Fact]

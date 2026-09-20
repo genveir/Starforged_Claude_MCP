@@ -43,6 +43,11 @@ public class TestFixture : IAsyncLifetime
 
         services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
         services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
+        services.AddSingleton<IDiceRoller>(_ => new DiceRoller(
+            actionDie: new Die(sides: 6),
+            firstChallengeDie: new Die(sides: 10),
+            secondChallengeDie: new Die(sides: 10)));
+        services.AddSingleton<IWritePermissions, WritePermissions>();
         services.AddSingleton<McpServer>();
 
         services.AddSingleton<IConfiguration>(configuration);
