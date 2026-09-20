@@ -30,8 +30,51 @@ public class WritePermissionToolTests
             {
                 ["category"] = Category,
                 ["filename"] = Filename,
-                ["text"] = "A derelict drifts in the Forge.",
-                ["indexed"] = false
+                ["text"] = "A derelict drifts in the Forge."
+            }
+        },
+        {
+            "replace_document_section",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["section"] = "Derelicts",
+                ["text"] = "## Derelicts" + "\n\nA derelict drifts in the Forge."
+            }
+        },
+        {
+            "append_to_document",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["text"] = "A derelict drifts in the Forge."
+            }
+        },
+        {
+            "delete_document_section",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["section"] = "Derelicts"
+            }
+        },
+        {
+            "index_document",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename
+            }
+        },
+        {
+            "deindex_document",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename
             }
         },
         {
@@ -171,7 +214,17 @@ public class WritePermissionToolTests
 
         mock.Setup(f => f.AddDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .ReturnsAsync(true);
-        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
+        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.ReplaceSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.AppendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.DeleteSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.IndexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(true);
+        mock.Setup(f => f.DeindexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);

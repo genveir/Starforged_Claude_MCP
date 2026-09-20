@@ -145,9 +145,9 @@ public class McpServer
                     {
                         category = new { type = "string", description = "Category the document belongs to; categories act as separate namespaces" },
                         filename = new { type = "string", description = "Filename, unique within the category (e.g., 'session_5.md')" },
-                        text = new { type = "string", description = "The full content of the document. Write well-formed Markdown with '#' and '##' headers: sections are what the document is chunked on, and their titles are what search results are labelled with. Content placed before the first header is stored, but search results for it carry no section label." },
+                        text = new { type = "string", description = "The full content of the document. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
                         summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
-                        indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it" }
+                        indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it. Use index_document or deindex_document to change this later." }
                     },
                     required = new[] { "category", "filename", "text", "indexed" }
                 }
@@ -155,7 +155,7 @@ public class McpServer
             new()
             {
                 Name = "update_document",
-                Description = "Replaces the entire content of an existing document. Anything indexed for it is rebuilt from the new content, or removed when indexed is false. Requires that request_write_permission has been called for the category.",
+                Description = "Replaces the entire content of an existing document. To change part of a long document, prefer replace_document_section, append_to_document or delete_document_section: they only need the text of the part that is changing, so they take far less time to write out. Whether the document is indexed is left as it is, and an indexed one is re-indexed from the new content. Requires that request_write_permission has been called for the category.",
                 InputSchema = new
                 {
                     type = "object",
@@ -163,11 +163,93 @@ public class McpServer
                     {
                         category = new { type = "string", description = "Category the document belongs to" },
                         filename = new { type = "string", description = "Filename of the document to replace" },
-                        text = new { type = "string", description = "The full replacement content; this is not a patch. Write well-formed Markdown with '#' and '##' headers: sections are what the document is chunked on, and their titles are what search results are labelled with." },
-                        summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
-                        indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it" }
+                        text = new { type = "string", description = "The full replacement content; this is not a patch. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
-                    required = new[] { "category", "filename", "text", "indexed" }
+                    required = new[] { "category", "filename", "text" }
+                }
+            },
+            new()
+            {
+                Name = "replace_document_section",
+                Description = "Replaces one section of a document and leaves the rest of the file untouched, so only the new text of that section has to be written out. A section runs to the next header at the same or a higher level, which means it carries every subsection nested under it: replacing a '#' section also replaces the '##' and '###' sections beneath it. Target the smallest section that covers the change. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to edit" },
+                        section = new { type = "string", description = "The section to replace, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
+                        text = new { type = "string", description = "The replacement text for that section. Start it with the section's own header line, at the level that header is at now; renaming the section means writing a different title on that line. Everything the old section held is gone, its subsections included, so write out any of them that should survive. Headers further down must be deeper than the section's own, since a shallower one would end it." },
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                    },
+                    required = new[] { "category", "filename", "section", "text" }
+                }
+            },
+            new()
+            {
+                Name = "append_to_document",
+                Description = "Adds text to the end of a document, or to the end of one of its sections, without rewriting what is already there. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to append to" },
+                        section = new { type = "string", description = "Optional. The section to append to, named by its header text without the '#' markers and matched ignoring case; qualify an ambiguous name with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. The text lands at the very end of that section, after the last subsection nested under it, rather than directly after its own paragraphs. Leave it out to append at the end of the document." },
+                        text = new { type = "string", description = "The text to add. When appending to a section, any header in it has to be deeper than that section's own header, since one at the same level or shallower would start a new section outside it instead." },
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                    },
+                    required = new[] { "category", "filename", "text" }
+                }
+            },
+            new()
+            {
+                Name = "delete_document_section",
+                Description = "Deletes one section of a document, leaving the rest of the file untouched. A section runs to the next header at the same or a higher level, so deleting a '#' section deletes every '##' and '###' section beneath it as well: name the exact section meant, and prefer the smallest one that covers what should go. An indexed document is re-indexed from what is left. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to edit" },
+                        section = new { type = "string", description = "The section to delete, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                    },
+                    required = new[] { "category", "filename", "section" }
+                }
+            },
+            new()
+            {
+                Name = "index_document",
+                Description = "Chunks and embeds a document so that search_index can find it. Editing a document that is already indexed re-indexes it on its own, so this is only needed for one stored unindexed. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to index" }
+                    },
+                    required = new[] { "category", "filename" }
+                }
+            },
+            new()
+            {
+                Name = "deindex_document",
+                Description = "Removes a document's embeddings, so search_index stops returning chunks of it. The document and its content are left alone, and index_document puts it back. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = "Category the document belongs to" },
+                        filename = new { type = "string", description = "Filename of the document to remove from the index" }
+                    },
+                    required = new[] { "category", "filename" }
                 }
             },
             new()
@@ -264,7 +346,7 @@ public class McpServer
             new()
             {
                 Name = "request_write_permission",
-                Description = "Permits add_document, update_document and archive_document to be used in one category. Those tools refuse to run until this has been called for the category they are given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits.",
+                Description = "Permits writing in one category: adding, updating, editing sections of, indexing and archiving its documents. Every one of those tools refuses to run until this has been called for the category it is given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits.",
                 InputSchema = new
                 {
                     type = "object",
@@ -367,6 +449,11 @@ public class McpServer
             "retrieve_search_results" => await ExecuteRetrieveSearchResultsAsync(arguments),
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "update_document" => await ExecuteUpdateDocumentAsync(arguments),
+            "replace_document_section" => await ExecuteReplaceDocumentSectionAsync(arguments),
+            "append_to_document" => await ExecuteAppendToDocumentAsync(arguments),
+            "delete_document_section" => await ExecuteDeleteDocumentSectionAsync(arguments),
+            "index_document" => await ExecuteIndexDocumentAsync(arguments),
+            "deindex_document" => await ExecuteDeindexDocumentAsync(arguments),
             "archive_document" => await ExecuteArchiveDocumentAsync(arguments),
             "get_document" => await ExecuteGetDocumentAsync(arguments),
             "get_document_summary" => await ExecuteGetDocumentSummaryAsync(arguments),
@@ -452,18 +539,98 @@ public class McpServer
         var filename = RequireString(arguments, "Filename", maxLength: 500);
         var text = RequireString(arguments, "Text", maxLength: 1_000_000);
         var summary = OptionalSummary(arguments);
-        var indexed = RequireBool(arguments, "indexed");
         RequireWriteEnabled(category);
 
-        _logger.LogDebug("Executing update_document: category={Category}, filename={Filename}, indexed={Indexed}, textLength={TextLength}",
-            category, filename, indexed, text.Length);
+        _logger.LogDebug("Executing update_document: category={Category}, filename={Filename}, textLength={TextLength}",
+            category, filename, text.Length);
 
-        var updated = await _documents.UpdateDocumentAsync(category, filename, text, summary, indexed);
+        var updated = await _documents.UpdateDocumentAsync(category, filename, text, summary);
 
-        if (!updated)
+        return RequireDocumentWasFound(updated, category, filename, message: "Document updated successfully");
+    }
+
+    private async Task<string> ExecuteReplaceDocumentSectionAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var section = RequireString(arguments, "Section", maxLength: 1_000);
+        var text = RequireString(arguments, "Text", maxLength: 1_000_000);
+        var summary = OptionalSummary(arguments);
+        RequireWriteEnabled(category);
+
+        _logger.LogDebug("Executing replace_document_section: category={Category}, filename={Filename}, section={Section}, textLength={TextLength}",
+            category, filename, section, text.Length);
+
+        var replaced = await _documents.ReplaceSectionAsync(category, filename, section, text, summary);
+
+        return RequireDocumentWasFound(replaced, category, filename, message: "Section replaced successfully");
+    }
+
+    private async Task<string> ExecuteAppendToDocumentAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var section = OptionalString(arguments, "section", maxLength: 1_000);
+        var text = RequireString(arguments, "Text", maxLength: 1_000_000);
+        var summary = OptionalSummary(arguments);
+        RequireWriteEnabled(category);
+
+        _logger.LogDebug("Executing append_to_document: category={Category}, filename={Filename}, section={Section}, textLength={TextLength}",
+            category, filename, section ?? "(end of document)", text.Length);
+
+        var appended = await _documents.AppendAsync(category, filename, section, text, summary);
+
+        return RequireDocumentWasFound(appended, category, filename, message: "Text appended successfully");
+    }
+
+    private async Task<string> ExecuteDeleteDocumentSectionAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var section = RequireString(arguments, "Section", maxLength: 1_000);
+        var summary = OptionalSummary(arguments);
+        RequireWriteEnabled(category);
+
+        _logger.LogInformation("Executing delete_document_section: category={Category}, filename={Filename}, section={Section}",
+            category, filename, section);
+
+        var deleted = await _documents.DeleteSectionAsync(category, filename, section, summary);
+
+        return RequireDocumentWasFound(deleted, category, filename, message: "Section deleted successfully");
+    }
+
+    private async Task<string> ExecuteIndexDocumentAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        RequireWriteEnabled(category);
+
+        _logger.LogDebug("Executing index_document: category={Category}, filename={Filename}", category, filename);
+
+        var indexed = await _documents.IndexDocumentAsync(category, filename);
+
+        return RequireDocumentWasFound(indexed, category, filename, message: "Document indexed successfully");
+    }
+
+    private async Task<string> ExecuteDeindexDocumentAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        RequireWriteEnabled(category);
+
+        _logger.LogInformation("Executing deindex_document: category={Category}, filename={Filename}", category, filename);
+
+        var deindexed = await _documents.DeindexDocumentAsync(category, filename);
+
+        return RequireDocumentWasFound(deindexed, category, filename, message: "Document removed from the index successfully");
+    }
+
+    private string RequireDocumentWasFound(bool found, string category, string filename, string message)
+    {
+        if (!found)
             throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
 
-        return JsonSerializer.Serialize(new { message = "Document updated successfully" }, _jsonOptions);
+        return JsonSerializer.Serialize(new { message }, _jsonOptions);
     }
 
     private async Task<string> ExecuteArchiveDocumentAsync(Dictionary<string, object> arguments)
@@ -570,7 +737,7 @@ public class McpServer
 
         _logger.LogWarning("Refused a write to read-only category {Category}", category);
         throw new ArgumentException(
-            $"Category '{category}' is read-only. Call request_write_permission for it before adding, updating or archiving documents in it.");
+            $"Category '{category}' is read-only. Call request_write_permission for it before writing to any document in it.");
     }
 
     private string ExecuteRollDice(Dictionary<string, object> arguments)
@@ -617,13 +784,39 @@ public class McpServer
         return raw is JsonElement je ? je.GetBoolean() : Convert.ToBoolean(raw);
     }
 
+    private static string? OptionalString(Dictionary<string, object> arguments, string key, int maxLength)
+    {
+        var value = ReadOptional(arguments, key);
+
+        if (value != null && value.Length > maxLength)
+            throw new ArgumentException($"{char.ToUpperInvariant(key[0]) + key[1..]} exceeds maximum length of {maxLength:N0} characters");
+
+        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    }
+
+    /// <summary>
+    /// An absent summary and an empty one mean different things on a write: absent keeps whatever the
+    /// document already carries, empty clears it. Both survive as far as the facade, which is where
+    /// that distinction is resolved against the stored summary.
+    /// </summary>
     private static string? OptionalSummary(Dictionary<string, object> arguments)
     {
-        var summary = arguments.TryGetValue("summary", out var raw) ? raw?.ToString() : null;
+        var summary = ReadOptional(arguments, "summary");
 
         if (summary != null && summary.Length > 512)
             throw new ArgumentException("Summary exceeds maximum length of 512 characters");
 
-        return string.IsNullOrWhiteSpace(summary) ? null : summary;
+        return summary?.Trim();
+    }
+
+    private static string? ReadOptional(Dictionary<string, object> arguments, string key)
+    {
+        if (!arguments.TryGetValue(key, out var raw) || raw == null)
+            return null;
+
+        if (raw is JsonElement { ValueKind: JsonValueKind.Null })
+            return null;
+
+        return raw.ToString();
     }
 }

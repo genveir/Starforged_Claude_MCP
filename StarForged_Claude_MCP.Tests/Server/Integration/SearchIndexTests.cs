@@ -125,17 +125,15 @@ public class SearchIndexTests : McpServerTestBase
 
         await AddIndexedDocument("withdrawn.md", "The coral reef teems with colorful tropical fish.");
 
-        await CallTool("32", "update_document", new Dictionary<string, object>
+        await CallTool("32", "deindex_document", new Dictionary<string, object>
         {
             ["category"] = Category,
-            ["filename"] = "withdrawn.md",
-            ["text"] = "The coral reef teems with colorful tropical fish.",
-            ["indexed"] = false
+            ["filename"] = "withdrawn.md"
         });
 
         var results = await SearchResults("coral reef tropical fish", topK: 5);
 
-        results.Should().BeEmpty(because: "updating with indexed=false removes what was indexed for the document");
+        results.Should().BeEmpty(because: "deindex_document removes what was indexed for the document");
     }
 
     [Fact]

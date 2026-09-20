@@ -19,7 +19,7 @@ public class DocumentsFacade : IDocumentsFacade
     {
         if (await _dbInterface.GetDocument(category, filename) != null) return false;
 
-        var id = await _dbInterface.StoreDocument(category, filename, content, summary);
+        var id = await _dbInterface.StoreDocument(category, filename, content, NullIfBlank(summary));
 
         if (indexed)
         {
@@ -29,22 +29,36 @@ public class DocumentsFacade : IDocumentsFacade
         return true;
     }
 
-    public async Task<bool> UpdateDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
+    public async Task<bool> UpdateDocumentAsync(string category, string filename, string content, string? summary) =>
+        await WriteAsync(category, filename, summary, rewrite: _ => content);
+
+    public async Task<bool> ReplaceSectionAsync(string category, string filename, string section, string text, string? summary) =>
+        await WriteAsync(category, filename, summary,
+            rewrite: existing => MarkdownSectionEditor.ReplaceSection(existing.Content, section, text));
+
+    public async Task<bool> AppendAsync(string category, string filename, string? section, string text, string? summary) =>
+        await WriteAsync(category, filename, summary,
+            rewrite: existing => MarkdownSectionEditor.AppendToSection(existing.Content, section, text));
+
+    public async Task<bool> DeleteSectionAsync(string category, string filename, string section, string? summary) =>
+        await WriteAsync(category, filename, summary,
+            rewrite: existing => MarkdownSectionEditor.DeleteSection(existing.Content, section));
+
+    public async Task<bool> IndexDocumentAsync(string category, string filename)
     {
         var existing = await _dbInterface.GetDocument(category, filename);
         if (existing == null) return false;
 
-        await _dbInterface.UpdateDocument(existing.Id, content, summary);
+        await _documentProcessing.IndexDocumentAsync(existing.Content, existing.Id, DocumentProcessorToUse.Markdown);
+        return true;
+    }
 
-        if (indexed)
-        {
-            await _documentProcessing.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
-        }
-        else
-        {
-            await _documentProcessing.RemoveIndexForDocumentAsync(existing.Id);
-        }
+    public async Task<bool> DeindexDocumentAsync(string category, string filename)
+    {
+        var existing = await _dbInterface.GetDocument(category, filename);
+        if (existing == null) return false;
 
+        await _documentProcessing.RemoveIndexForDocumentAsync(existing.Id);
         return true;
     }
 
@@ -68,4 +82,31 @@ public class DocumentsFacade : IDocumentsFacade
 
     public async Task<List<Beat>> GetCanonicalBeatsAsync(string category, int sessionNumber) =>
         CanonicalBeats.Select(await _dbInterface.GetBeatsForSession(category, sessionNumber));
+
+    /// <summary>
+    /// The one path every content write takes: rewrite the content, keep the summary unless this
+    /// write carries one of its own, and rebuild the index only for a document that already had one.
+    /// Whether a document is indexed is <see cref="IndexDocumentAsync"/>'s business, not an edit's.
+    /// </summary>
+    private async Task<bool> WriteAsync(string category, string filename, string? summary, Func<Document, string> rewrite)
+    {
+        var existing = await _dbInterface.GetDocument(category, filename);
+        if (existing == null) return false;
+
+        var content = rewrite(existing);
+
+        await _dbInterface.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
+
+        if (existing.Indexed)
+        {
+            await _documentProcessing.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+        }
+
+        return true;
+    }
+
+    private static string? ResolveSummary(string? existingSummary, string? summary) =>
+        summary == null ? existingSummary : NullIfBlank(summary);
+
+    private static string? NullIfBlank(string? summary) => string.IsNullOrWhiteSpace(summary) ? null : summary;
 }

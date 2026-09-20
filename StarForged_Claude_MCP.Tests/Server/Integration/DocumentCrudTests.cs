@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
@@ -109,8 +109,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["category"] = Category,
             ["filename"] = "revised.md",
             ["text"] = "The replacement text.",
-            ["summary"] = "New summary",
-            ["indexed"] = false
+            ["summary"] = "New summary"
         });
 
         updated.Error.Should().BeNull();
@@ -135,8 +134,7 @@ public class DocumentCrudTests : McpServerTestBase
         {
             ["category"] = Category,
             ["filename"] = "never_stored.md",
-            ["text"] = "Nothing to replace.",
-            ["indexed"] = false
+            ["text"] = "Nothing to replace."
         });
 
         response.Error.Should().NotBeNull();
