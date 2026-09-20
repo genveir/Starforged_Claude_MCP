@@ -61,6 +61,14 @@ public class DbInterface
         return results.ToList();
     }
 
+    public async Task<List<string>> GetCategories()
+    {
+        using var connection = new SqlConnection(_connectionString);
+        var results = await connection.QueryAsync<string>(
+            "select distinct Category from Documents order by Category");
+        return results.ToList();
+    }
+
     public async Task UpdateDocument(int id, string content, string? summary)
     {
         using var connection = new SqlConnection(_connectionString);

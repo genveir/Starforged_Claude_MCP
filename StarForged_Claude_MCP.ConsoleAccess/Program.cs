@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.Export;
+using StarForged_Claude_MCP.ConsoleAccess.List;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings;
@@ -46,6 +47,7 @@ public class Program
         var downloader = host.Services.GetRequiredService<FileDownloader>();
         var exporter = host.Services.GetRequiredService<CategoryExporter>();
         var searcher = host.Services.GetRequiredService<Searcher>();
+        var lister = host.Services.GetRequiredService<CategoryLister>();
         var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
         switch (options)
@@ -62,6 +64,9 @@ public class Program
             case SearchOptions searchOptions:
                 await searcher.Search(searchOptions);
                 break;
+            case ListOptions listOptions:
+                await lister.List(listOptions);
+                break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
 
@@ -74,6 +79,7 @@ public class Program
         services.AddSingleton<FileDownloader>();
         services.AddSingleton<CategoryExporter>();
         services.AddSingleton<Searcher>();
+        services.AddSingleton<CategoryLister>();
         services.AddSingleton<BeatPreprocessor>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
         services.AddEmbeddingsServices();
@@ -93,6 +99,7 @@ public class Program
             "download" => DownloadOptions.Parse(args.Skip(1).ToArray()),
             "export" => ExportOptions.Parse(args.Skip(1).ToArray()),
             "search" => SearchOptions.Parse(args.Skip(1).ToArray()),
+            "list" => ListOptions.Parse(args.Skip(1).ToArray()),
             _ => HandleInvalidCommand(args[0])
         };
 
@@ -112,6 +119,8 @@ public class Program
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <filename>");
         Console.WriteLine("  .\\ConsoleAccess.exe export <category> --output <folder> [--overwrite]");
         Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe list");
+        Console.WriteLine("  .\\ConsoleAccess.exe list <category>");
         Console.WriteLine();
     }
 
