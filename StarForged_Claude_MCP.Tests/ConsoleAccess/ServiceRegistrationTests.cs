@@ -2,8 +2,8 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.ConsoleAccess;
+using StarForged_Claude_MCP.ConsoleAccess.Cat;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
-using StarForged_Claude_MCP.ConsoleAccess.Export;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 
@@ -14,7 +14,7 @@ public class ServiceRegistrationTests
     [Theory]
     [InlineData(typeof(FileUploader))]
     [InlineData(typeof(FileDownloader))]
-    [InlineData(typeof(CategoryExporter))]
+    [InlineData(typeof(DocumentPrinter))]
     [InlineData(typeof(Searcher))]
     [InlineData(typeof(ISummaryPrompt))]
     public void EveryConsoleCommand_ShouldResolveFromTheConfiguredContainer(Type service)

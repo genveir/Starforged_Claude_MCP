@@ -1,6 +1,6 @@
 namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
-public enum UploadMode { None, Folder, Beats }
+public enum UploadMode { None, Folder, Document, Beats }
 
 public enum SummaryMode
 {
@@ -20,7 +20,7 @@ public enum SummaryMode
 public record UploadOptions(
     string Category,
     UploadMode Mode,
-    string? FolderPath,
+    string? SourcePath,
     int SessionNumber = 0,
     bool Indexed = false,
     SummaryMode Summaries = SummaryMode.Missing) : IConsoleAccessOptions
@@ -34,7 +34,7 @@ public record UploadOptions(
         }
 
         UploadMode? mode = null;
-        string? folderPath = null;
+        string? sourcePath = null;
         int sessionNumber = 0;
         bool indexed = false;
         var summaries = SummaryMode.Missing;
@@ -48,7 +48,13 @@ public record UploadOptions(
                 case "-f":
                     if (i + 1 >= rest.Length) { PrintUsage(); return null; }
                     mode = UploadMode.Folder;
-                    folderPath = rest[++i];
+                    sourcePath = rest[++i];
+                    break;
+                case "--document":
+                case "-d":
+                    if (i + 1 >= rest.Length) { PrintUsage(); return null; }
+                    mode = UploadMode.Document;
+                    sourcePath = rest[++i];
                     break;
                 case "--beats":
                 case "-b":
@@ -94,14 +100,14 @@ public record UploadOptions(
             return null;
         }
 
-        if (mode != UploadMode.Folder && summariesGiven)
+        if (mode == UploadMode.Beats && summariesGiven)
         {
-            Console.Error.WriteLine("Error: --summaries only applies to --folder; beats have no summaries.");
+            Console.Error.WriteLine("Error: beats have no summaries, so --summaries cannot be used with --beats.");
             PrintUsage();
             return null;
         }
 
-        return new UploadOptions(category, mode.Value, folderPath, sessionNumber, indexed, summaries);
+        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, indexed, summaries);
     }
 
     public static void PrintUsage()
@@ -112,9 +118,12 @@ public record UploadOptions(
         Console.WriteLine("  <category>              Category everything in this run is stored under (required)");
         Console.WriteLine("  -f, --folder <path>     Stores every .md file in the folder as a document, replacing");
         Console.WriteLine("                          any already stored under the same filename");
+        Console.WriteLine("  -d, --document <path>   Stores a single file as a document, replacing any already");
+        Console.WriteLine("                          stored under the same filename");
         Console.WriteLine("  -b, --beats <session>   Reads session beats from stdin; ctrl+Z undoes the last one");
         Console.WriteLine("  -i, --index             Chunk and embed what is stored, making it searchable");
-        Console.WriteLine("  -s, --summaries <mode>  How a folder upload handles summaries (default: missing)");
+        Console.WriteLine("  -s, --summaries <mode>  How a folder or document upload handles summaries");
+        Console.WriteLine("                          (default: missing)");
         Console.WriteLine("                            all      Ask for every file, blank keeps the stored one");
         Console.WriteLine("                            missing  Ask only where there is no summary yet");
         Console.WriteLine("                            none     Ask for nothing, leave stored summaries alone");

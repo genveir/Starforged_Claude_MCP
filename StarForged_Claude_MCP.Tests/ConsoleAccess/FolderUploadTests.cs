@@ -140,6 +140,27 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             .BeEmpty(because: "a replacement without --index leaves nothing searchable behind");
     }
 
+    [Fact]
+    public async Task UploadDocument_ShouldStoreOnlyThatFileAndApplyTheSummaryMode()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("chosen.md", Markdown("Chosen", "The one to upload."));
+        folder.Write("sibling.md", Markdown("Sibling", "Left where it is."));
+
+        var prompt = await Run(
+            new UploadOptions(Category, UploadMode.Document, SourcePath: Path.Combine(folder.Path, "chosen.md")),
+            answers: new() { ["chosen.md"] = "Typed for chosen" });
+
+        prompt.Asked.Should().BeEquivalentTo(["chosen.md"]);
+
+        var documents = await Db.GetDocumentIndex(Category);
+        documents.Should().ContainSingle(because: "only the named file is uploaded, not the rest of its folder")
+            .Which.Filename.Should().Be("chosen.md");
+        (await Db.GetDocument(Category, "chosen.md"))!.Summary.Should().Be("Typed for chosen");
+    }
+
     private static string Markdown(string header, string body) =>
         $"# {header}{Environment.NewLine}{Environment.NewLine}{body}";
 
@@ -147,7 +168,12 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         TempFolder folder,
         SummaryMode summaries,
         bool indexed = false,
-        Dictionary<string, string>? answers = null)
+        Dictionary<string, string>? answers = null) =>
+        await Run(
+            new UploadOptions(Category, UploadMode.Folder, SourcePath: folder.Path, Indexed: indexed, Summaries: summaries),
+            answers);
+
+    private async Task<RecordingSummaryPrompt> Run(UploadOptions options, Dictionary<string, string>? answers = null)
     {
         var prompt = new RecordingSummaryPrompt(answers ?? []);
 
@@ -157,9 +183,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             new BeatPreprocessor(),
             prompt);
 
-        await uploader.UploadFile(
-            new UploadOptions(Category, UploadMode.Folder, FolderPath: folder.Path, Indexed: indexed, Summaries: summaries),
-            CancellationToken.None);
+        await uploader.UploadFile(options, CancellationToken.None);
 
         return prompt;
     }
@@ -182,23 +206,6 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             Offered.Add(existingSummary);
 
             return answers.TryGetValue(filename, out var answer) ? answer : existingSummary;
-        }
-    }
-
-    private sealed class TempFolder : IDisposable
-    {
-        public string Path { get; } =
-            System.IO.Path.Combine(System.IO.Path.GetTempPath(), "sf_upload_" + Guid.NewGuid().ToString("N"));
-
-        public TempFolder() => Directory.CreateDirectory(Path);
-
-        public void Write(string filename, string content) =>
-            File.WriteAllText(System.IO.Path.Combine(Path, filename), content);
-
-        public void Dispose()
-        {
-            try { Directory.Delete(Path, recursive: true); }
-            catch (IOException) { }
         }
     }
 }

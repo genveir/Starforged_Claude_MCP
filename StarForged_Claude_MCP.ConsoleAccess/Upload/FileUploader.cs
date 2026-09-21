@@ -27,16 +27,26 @@ public class FileUploader
 
     public async Task UploadFile(UploadOptions options, CancellationToken cancellationToken)
     {
-        if (options.Mode == UploadMode.Folder && !Directory.Exists(options.FolderPath))
+        if (options.Mode == UploadMode.Folder && !Directory.Exists(options.SourcePath))
         {
-            Console.Error.WriteLine($"Error: Folder '{options.FolderPath}' does not exist.");
+            Console.Error.WriteLine($"Error: Folder '{options.SourcePath}' does not exist.");
+            return;
+        }
+
+        if (options.Mode == UploadMode.Document && !File.Exists(options.SourcePath))
+        {
+            Console.Error.WriteLine($"Error: File '{options.SourcePath}' does not exist.");
             return;
         }
 
         switch (options.Mode)
         {
             case UploadMode.Folder:
-                await UploadFolderAsync(options.Category, options.FolderPath!, options.Indexed, options.Summaries);
+                var files = Directory.GetFiles(options.SourcePath!, "*.md", SearchOption.AllDirectories);
+                await UploadFilesAsync(options.Category, files, options.Indexed, options.Summaries);
+                break;
+            case UploadMode.Document:
+                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Indexed, options.Summaries);
                 break;
             case UploadMode.Beats:
                 await RunBeatsAsync(options.Category, options.SessionNumber, cancellationToken);
@@ -46,10 +56,8 @@ public class FileUploader
         }
     }
 
-    private async Task UploadFolderAsync(string category, string folderPath, bool indexed, SummaryMode summaries)
+    private async Task UploadFilesAsync(string category, string[] files, bool indexed, SummaryMode summaries)
     {
-        var files = Directory.GetFiles(folderPath, "*.md", SearchOption.AllDirectories);
-
         Console.WriteLine($"Found {files.Length} file(s) to process.");
 
         var stored = 0;
