@@ -44,6 +44,13 @@ public static class MarkdownSectionEditor
         return document.Join(kept);
     }
 
+    /// <summary>
+    /// For each line of the content, split on line breaks, the path of the innermost section it sits in,
+    /// written the way the section tools accept it. Lines above the first header belong to no section.
+    /// </summary>
+    public static string?[] SectionPathsByLine(string content) =>
+        MarkdownDocument.Parse(content).SectionPathsByLine();
+
     public static string DeleteSection(string content, string section)
     {
         var document = MarkdownDocument.Parse(content);
@@ -159,6 +166,22 @@ public static class MarkdownSectionEditor
                 Start: _headers[matchedIndex].LineIndex,
                 End: EndOfSection(matchedIndex),
                 Path: PathOf(matchedIndex));
+        }
+
+        public string?[] SectionPathsByLine()
+        {
+            var paths = new string?[Lines.Length];
+
+            for (int i = 0; i < _headers.Count; i++)
+            {
+                var path = PathOf(i);
+                var end = i + 1 < _headers.Count ? _headers[i + 1].LineIndex : Lines.Length;
+
+                for (int line = _headers[i].LineIndex; line < end; line++)
+                    paths[line] = path;
+            }
+
+            return paths;
         }
 
         /// <summary>

@@ -29,6 +29,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
         result.Should().NotBeNull();
         result.Tools.Select(t => t.Name).Should().BeEquivalentTo(
             "search_index",
+            "find_text",
             "retrieve_search_results",
             "add_document",
             "update_document",
@@ -45,6 +46,32 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "roll_dice",
             "request_write_permission",
             "release_write_permission");
+    }
+
+    [Fact]
+    public async Task ToolsList_EveryCategoryArgument_ShouldSayWhichLevelOfCategoryItTakes()
+    {
+        var response = await InvokeServerMethod(new JsonRpcRequest { Id = "4", Method = "tools/list", Params = new { } });
+        var tools = JsonSerializer.SerializeToElement(response.Result, _jsonOptions).GetProperty("tools").EnumerateArray();
+
+        var categoryDescriptions = tools
+            .Where(tool => tool.GetProperty("inputSchema").GetProperty("properties").TryGetProperty("category", out _))
+            .ToDictionary(
+                tool => tool.GetProperty("name").GetString()!,
+                tool => tool.GetProperty("inputSchema").GetProperty("properties").GetProperty("category")
+                    .GetProperty("description").GetString()!);
+
+        categoryDescriptions.Should().NotBeEmpty();
+
+        foreach (var (name, description) in categoryDescriptions)
+        {
+            description.Should().Contain("dotted path", because: "'{0}' has to show how subcategories are written", name);
+
+            if (name is "search_index" or "find_text")
+                description.Should().Contain("any level", because: "'{0}' searches everything under a parent", name);
+            else if (name != "release_write_permission")
+                description.Should().StartWith("Leaf category", because: "'{0}' refuses a parent category", name);
+        }
     }
 
     [Fact]

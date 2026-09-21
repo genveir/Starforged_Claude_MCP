@@ -1,6 +1,7 @@
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
+using StarForged_Claude_MCP.Server.Models;
 
 namespace StarForged_Claude_MCP.Server.Services;
 
@@ -80,8 +81,22 @@ public class DocumentsFacade : IDocumentsFacade
     public async Task<List<DocumentIndexEntry>> GetDocumentIndexAsync(string category) =>
         await _dbInterface.GetDocumentIndex(category);
 
+    public async Task<TextSearchResult?> FindTextAsync(string category, string text, bool wholeWord, string? filename)
+    {
+        if (filename != null && await _dbInterface.GetDocumentSummary(category, filename) == null) return null;
+
+        var candidates = await _dbInterface.FindDocumentsContaining(category, text, filename);
+        return DocumentTextSearch.Search(candidates, text, wholeWord);
+    }
+
     public async Task<List<Beat>> GetCanonicalBeatsAsync(string category, int sessionNumber) =>
         CanonicalBeats.Select(await _dbInterface.GetBeatsForSession(category, sessionNumber));
+
+    public async Task<List<string>> GetSubcategoriesAsync(string category) =>
+        await _dbInterface.GetCategoriesUnder(category);
+
+    public async Task<List<string>> GetAncestorsHoldingDocumentsAsync(string category) =>
+        await _dbInterface.GetAncestorsHoldingDocuments(category);
 
     /// <summary>
     /// The one path every content write takes: rewrite the content, keep the summary unless this

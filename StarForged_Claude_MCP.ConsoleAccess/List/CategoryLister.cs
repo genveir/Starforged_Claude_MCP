@@ -45,6 +45,8 @@ public class CategoryLister
 
         if (index.Count == 0)
         {
+            if (!await CategoryHierarchy.RequireLeaf(dbInterface, category)) return;
+
             Console.Error.WriteLine($"No documents found for category '{category}'.");
             return;
         }

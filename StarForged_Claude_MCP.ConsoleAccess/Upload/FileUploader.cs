@@ -39,6 +39,11 @@ public class FileUploader
             return;
         }
 
+        var categoryAccepted = options.Mode == UploadMode.Beats
+            ? await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)
+            : await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category);
+        if (!categoryAccepted) return;
+
         switch (options.Mode)
         {
             case UploadMode.Folder:

@@ -4,6 +4,7 @@ using Moq;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
+using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
 
@@ -133,6 +134,8 @@ public class WritePermissionToolTests
         var response = await CallToolAsync(server, toolName, arguments);
 
         response.ShouldHaveBeenRefused();
+        documents.Verify(f => f.GetSubcategoriesAsync(Category), Times.Once,
+            failMessage: "request_write_permission checks that the category is a leaf");
         documents.VerifyNoOtherCalls();
     }
 
@@ -154,6 +157,8 @@ public class WritePermissionToolTests
 
         response.ShouldHaveBeenRefused().Should().Contain("read-only",
             because: "permission is granted per category, not server-wide");
+        documents.Verify(f => f.GetSubcategoriesAsync(Category), Times.Once,
+            failMessage: "request_write_permission checks that the category is a leaf");
         documents.VerifyNoOtherCalls();
     }
 
@@ -174,6 +179,23 @@ public class WritePermissionToolTests
         });
 
         response.ShouldHaveSucceeded();
+    }
+
+    [Fact]
+    public async Task RequestWritePermission_ShouldRemindTheCallerToReleaseThatCategory()
+    {
+        var server = CreateServer(CreateDocumentsMock(), new WritePermissions());
+
+        var response = await CallToolAsync(server, "request_write_permission", new Dictionary<string, object> { ["category"] = Category });
+
+        response.ShouldHaveSucceeded();
+        var text = ((CallToolResult)response.Result!).Content[0].Text;
+        text.Should().Contain($"'{Category}'", because: "the model reads this text as it is, so apostrophes are not escaped as \\u0027");
+
+        var payload = JsonSerializer.Deserialize<JsonElement>(text);
+        payload.GetProperty("message").GetString().Should()
+            .Contain($"Call release_write_permission for '{Category}'",
+                because: "the instruction has to sit in recent context, tied to the exact category, for the caller to act on it");
     }
 
     [Fact]
@@ -230,6 +252,10 @@ public class WritePermissionToolTests
             .ReturnsAsync(true);
         mock.Setup(f => f.GetDocumentIndexAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<DocumentIndexEntry>());
+        mock.Setup(f => f.GetSubcategoriesAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+        mock.Setup(f => f.GetAncestorsHoldingDocumentsAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
 
         return mock;
     }

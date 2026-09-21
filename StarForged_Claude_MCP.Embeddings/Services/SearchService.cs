@@ -42,7 +42,7 @@ namespace StarForged_Claude_MCP.Embeddings.Services
 
             var results = similarityResults
                 .Join(textResults, sim => sim.Id, text => text.Id,
-                    (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id, Filename: text.Filename))
+                    (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id, Category: text.Category, Filename: text.Filename))
                 .ToArray();
 
             return results;

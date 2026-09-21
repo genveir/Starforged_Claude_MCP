@@ -161,6 +161,34 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         (await Db.GetDocument(Category, "chosen.md"))!.Summary.Should().Be("Typed for chosen");
     }
 
+    [Fact]
+    public async Task UploadFolder_IntoAParentCategory_ShouldStoreNothing()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument("Campaign.Oracles", "moons.md", "# Moons", summary: null);
+        folder.Write("overview.md", Markdown("Overview", "The campaign at a glance."));
+
+        await Run(new UploadOptions("Campaign", UploadMode.Folder, SourcePath: folder.Path, Indexed: false, Summaries: SummaryMode.None));
+
+        (await Db.GetDocumentIndex("Campaign")).Should().BeEmpty(because: "a category holds either documents or subcategories");
+    }
+
+    [Fact]
+    public async Task UploadFolder_UnderACategoryThatHoldsDocuments_ShouldStoreNothing()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument("Campaign.Oracles", "moons.md", "# Moons", summary: null);
+        folder.Write("red_moon.md", Markdown("The Red Moon", "It rises last."));
+
+        await Run(new UploadOptions("Campaign.Oracles.Moons", UploadMode.Folder, SourcePath: folder.Path, Indexed: false, Summaries: SummaryMode.None));
+
+        (await Db.GetDocumentIndex("Campaign.Oracles.Moons")).Should().BeEmpty();
+    }
+
     private static string Markdown(string header, string body) =>
         $"# {header}{Environment.NewLine}{Environment.NewLine}{body}";
 

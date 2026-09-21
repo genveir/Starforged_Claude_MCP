@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
+using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Server.Models;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Server.Services;
@@ -23,7 +25,10 @@ public class McpServer
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = false
+            WriteIndented = false,
+            // What this serializes is read by a model, never embedded in HTML, so there is nothing to guard
+            // against by writing an apostrophe as '; it only makes messages harder to read.
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
         };
     }
 
@@ -99,6 +104,16 @@ public class McpServer
         };
     }
 
+    private const string LeafCategoryRule =
+        "its full dotted path, such as 'Campaign.Oracles'. A leaf is a category with no subcategories under it; " +
+        "a parent such as 'Campaign' is refused, and the refusal lists the leaf categories under it.";
+
+    private const string LeafCategoryDescription = "Leaf category the document belongs to: " + LeafCategoryRule;
+
+    private const string ScopeCategoryDescription =
+        "Category to search, at any level. Categories are dotted paths: 'Campaign.Oracles' is a subcategory of " +
+        "'Campaign'. A parent category covers every category under it, and a leaf covers only itself.";
+
     private JsonRpcResponse HandleToolsList(JsonRpcRequest request)
     {
         _logger.LogDebug("Handling tools/list");
@@ -107,17 +122,34 @@ public class McpServer
             new()
             {
                 Name = "search_index",
-                Description = "Search for relevant chunks by semantic similarity within a single category. Only documents stored with indexed=true are searchable. Returns IDs, scores, filenames and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs, or get_document to fetch the whole file a chunk came from",
+                Description = "Search for relevant chunks by semantic similarity within a category and every category under it. Only documents stored with indexed=true are searchable. Returns IDs, scores, the leaf category and filename each chunk came from, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs, or get_document to fetch the whole file a chunk came from. To find where an exact name or term appears, use find_text instead.",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
                         query = new { type = "string", description = "Natural language search query" },
-                        category = new { type = "string", description = "Category to search; only chunks from documents in this category are considered" },
+                        category = new { type = "string", description = ScopeCategoryDescription },
                         topK = new { type = "number", description = "Number of results to return (default: 3, max: 10)" }
                     },
                     required = new[] { "query", "category" }
+                }
+            },
+            new()
+            {
+                Name = "find_text",
+                Description = "Finds the documents in a category, and every category under it, whose content contains an exact word or phrase, ignoring case. Use it for names, places, ship names and other terms where exact spelling matters: search_index matches on meaning, and for a rare proper noun such as a surname it tends to return loosely related chunks rather than the ones that mention it. Unlike search_index, this searches every document, indexed or not. Returns the matching files, most matches first, each with its leaf category, its match count and up to 5 short snippets labelled with the section they are in; at most 25 files are listed, and truncated says whether more matched. A snippet's section can be passed to the section tools as it is.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = ScopeCategoryDescription },
+                        text = new { type = "string", description = "The word or phrase to find, matched literally and ignoring case, e.g. 'Bluejay' or 'the Iron Veil'. It is not a pattern: characters such as '*' and '%' match only themselves. Spaces in it also match line breaks." },
+                        wholeWord = new { type = "boolean", description = "Optional, default false. When true, 'Jay' matches 'Jay' and \"Jay's\" but not 'Bluejay'." },
+                        filename = new { type = "string", description = "Optional. Search only this document, to see where in it a term appears without fetching the whole file. A filename is only unique within its leaf category, so category then has to be that leaf rather than a parent." }
+                    },
+                    required = new[] { "category", "text" }
                 }
             },
             new()
@@ -137,13 +169,13 @@ public class McpServer
             new()
             {
                 Name = "add_document",
-                Description = "Stores a new document under a filename within a category. Fails if that category already holds a document with the same filename; use update_document to replace one. Requires that request_write_permission has been called for the category.",
+                Description = "Stores a new document under a filename within a leaf category. A category holds either documents or subcategories, never both, so a new category cannot be created under one that already holds documents. Fails if that category already holds a document with the same filename; use update_document to replace one. Requires that request_write_permission has been called for the category.",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to; categories act as separate namespaces" },
+                        category = new { type = "string", description = LeafCategoryDescription + " Categories act as separate namespaces; a new one is created by storing its first document." },
                         filename = new { type = "string", description = "Filename, unique within the category (e.g., 'session_5.md')" },
                         text = new { type = "string", description = "The full content of the document. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
                         summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
@@ -161,7 +193,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to replace" },
                         text = new { type = "string", description = "The full replacement content; this is not a patch. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
                         summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
@@ -178,7 +210,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to edit" },
                         section = new { type = "string", description = "The section to replace, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
                         text = new { type = "string", description = "The replacement text for that section. Start it with the section's own header line, at the level that header is at now; renaming the section means writing a different title on that line. Everything the old section held is gone, its subsections included, so write out any of them that should survive. Headers further down must be deeper than the section's own, since a shallower one would end it." },
@@ -196,7 +228,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to append to" },
                         section = new { type = "string", description = "Optional. The section to append to, named by its header text without the '#' markers and matched ignoring case; qualify an ambiguous name with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. The text lands at the very end of that section, after the last subsection nested under it, rather than directly after its own paragraphs. Leave it out to append at the end of the document." },
                         text = new { type = "string", description = "The text to add. When appending to a section, any header in it has to be deeper than that section's own header, since one at the same level or shallower would start a new section outside it instead." },
@@ -214,7 +246,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to edit" },
                         section = new { type = "string", description = "The section to delete, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
                         summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
@@ -231,7 +263,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to index" }
                     },
                     required = new[] { "category", "filename" }
@@ -246,7 +278,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to remove from the index" }
                     },
                     required = new[] { "category", "filename" }
@@ -265,7 +297,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to archive" }
                     },
                     required = new[] { "category", "filename" }
@@ -280,7 +312,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to retrieve" }
                     },
                     required = new[] { "category", "filename" }
@@ -295,7 +327,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the document belongs to" },
+                        category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document, as returned by search_index or document_index" }
                     },
                     required = new[] { "category", "filename" }
@@ -304,13 +336,13 @@ public class McpServer
             new()
             {
                 Name = "document_index",
-                Description = "Lists the documents in a category with their summaries, without their content. Use get_document to fetch one in full.",
+                Description = "Lists the documents in a leaf category with their summaries, without their content. Use get_document to fetch one in full. Given a parent category, it is refused with a list of the leaf categories under it.",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category to list" }
+                        category = new { type = "string", description = "Leaf category to list: " + LeafCategoryRule }
                     },
                     required = new[] { "category" }
                 }
@@ -324,7 +356,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category the session belongs to" },
+                        category = new { type = "string", description = "Leaf category the session belongs to: " + LeafCategoryRule },
                         sessionNumber = new { type = "number", description = "The session number to retrieve beats for" }
                     },
                     required = new[] { "category", "sessionNumber" }
@@ -346,13 +378,13 @@ public class McpServer
             new()
             {
                 Name = "request_write_permission",
-                Description = "Permits writing in one category: adding, updating, editing sections of, indexing and archiving its documents. Every one of those tools refuses to run until this has been called for the category it is given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits.",
+                Description = "Permits writing in one leaf category: adding, updating, editing sections of, indexing and archiving its documents. Every one of those tools refuses to run until this has been called for the category it is given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits.",
                 InputSchema = new
                 {
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category to permit writes in" }
+                        category = new { type = "string", description = "Leaf category to permit writes in: " + LeafCategoryRule + " It does not have to exist yet, so that add_document can create it." }
                     },
                     required = new[] { "category" }
                 }
@@ -366,7 +398,7 @@ public class McpServer
                     type = "object",
                     properties = new
                     {
-                        category = new { type = "string", description = "Category to return to read-only" }
+                        category = new { type = "string", description = "The category passed to request_write_permission, as its full dotted path such as 'Campaign.Oracles'" }
                     },
                     required = new[] { "category" }
                 }
@@ -453,6 +485,7 @@ public class McpServer
         return toolName switch
         {
             "search_index" => await ExecuteSearchAsync(arguments),
+            "find_text" => await ExecuteFindTextAsync(arguments),
             "retrieve_search_results" => await ExecuteRetrieveSearchResultsAsync(arguments),
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "update_document" => await ExecuteUpdateDocumentAsync(arguments),
@@ -467,7 +500,7 @@ public class McpServer
             "document_index" => await ExecuteDocumentIndexAsync(arguments),
             "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
             "roll_dice" => ExecuteRollDice(arguments),
-            "request_write_permission" => ExecuteRequestWritePermission(arguments),
+            "request_write_permission" => await ExecuteRequestWritePermissionAsync(arguments),
             "release_write_permission" => ExecuteReleaseWritePermission(arguments),
             _ => throw new InvalidOperationException($"Unknown tool: {toolName}")
         };
@@ -488,10 +521,37 @@ public class McpServer
         {
             id = r.Id,
             score = r.SimilarityScore,
+            category = r.Category,
             filename = r.Filename,
             summary = r.BriefSummary
         }).ToArray();
         return JsonSerializer.Serialize(new { results = briefResults }, _jsonOptions);
+    }
+
+    private async Task<string> ExecuteFindTextAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var text = RequireString(arguments, "Text", maxLength: 200).Trim();
+        var wholeWord = OptionalBool(arguments, "wholeWord", defaultValue: false);
+        var filename = OptionalString(arguments, "filename", maxLength: 500);
+
+        if (text.Length < 2)
+            throw new ArgumentException("Text has to be at least 2 characters long");
+
+        if (filename != null)
+            await RequireLeafCategoryAsync(category);
+
+        _logger.LogDebug("Executing find_text: category={Category}, text={Text}, wholeWord={WholeWord}, filename={Filename}",
+            category, text, wholeWord, filename ?? "(all documents)");
+
+        var result = await _documents.FindTextAsync(category, text, wholeWord, filename);
+
+        if (result == null)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        _logger.LogDebug("find_text found {MatchCount} match(es) in {DocumentCount} document(s)",
+            result.TotalMatches, result.Documents.Count);
+        return JsonSerializer.Serialize(result, _jsonOptions);
     }
 
     private async Task<string> ExecuteRetrieveSearchResultsAsync(Dictionary<string, object> arguments)
@@ -517,6 +577,8 @@ public class McpServer
         var summary = OptionalSummary(arguments);
         var indexed = RequireBool(arguments, "indexed");
         RequireWriteEnabled(category);
+        await RequireLeafCategoryAsync(category);
+        await RequireNoAncestorHoldsDocumentsAsync(category);
 
         _logger.LogDebug("Executing add_document: category={Category}, filename={Filename}, indexed={Indexed}, textLength={TextLength}",
             category, filename, indexed, text.Length);
@@ -650,6 +712,8 @@ public class McpServer
         var category = RequireCategory(arguments);
         var filename = RequireString(arguments, "Filename", maxLength: 500);
 
+        await RequireLeafCategoryAsync(category);
+
         _logger.LogDebug("Executing get_document: category={Category}, filename={Filename}", category, filename);
 
         var document = await _documents.GetDocumentAsync(category, filename);
@@ -664,6 +728,8 @@ public class McpServer
     {
         var category = RequireCategory(arguments);
         var filename = RequireString(arguments, "Filename", maxLength: 500);
+
+        await RequireLeafCategoryAsync(category);
 
         _logger.LogDebug("Executing get_document_summary: category={Category}, filename={Filename}", category, filename);
 
@@ -685,6 +751,7 @@ public class McpServer
     private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
     {
         var category = RequireCategory(arguments);
+        await RequireLeafCategoryAsync(category);
 
         _logger.LogDebug("Executing document_index: category={Category}", category);
         var documents = await _documents.GetDocumentIndexAsync(category);
@@ -696,6 +763,7 @@ public class McpServer
     {
         var category = RequireCategory(arguments);
         var sessionNumber = RequireInt(arguments, "sessionNumber");
+        await RequireLeafCategoryAsync(category);
 
         _logger.LogDebug("Executing get_canonical_beats: category={Category}, sessionNumber={SessionNumber}", category, sessionNumber);
         var beats = await _documents.GetCanonicalBeatsAsync(category, sessionNumber);
@@ -703,15 +771,20 @@ public class McpServer
         return JsonSerializer.Serialize(new { beats }, _jsonOptions);
     }
 
-    private string ExecuteRequestWritePermission(Dictionary<string, object> arguments)
+    private async Task<string> ExecuteRequestWritePermissionAsync(Dictionary<string, object> arguments)
     {
         var category = RequireCategory(arguments);
+        await RequireLeafCategoryAsync(category);
 
         _logger.LogInformation("Executing request_write_permission: category={Category}", category);
         _writePermissions.EnableWrite(category);
 
         return JsonSerializer.Serialize(
-            new { message = $"Writes are now permitted in category '{category}'." }, _jsonOptions);
+            new
+            {
+                message = $"Writes are now permitted in category '{category}'. " +
+                    $"Call release_write_permission for '{category}' as soon as you have finished writing to it."
+            }, _jsonOptions);
     }
 
     private string ExecuteReleaseWritePermission(Dictionary<string, object> arguments)
@@ -732,6 +805,30 @@ public class McpServer
         _logger.LogWarning("Refused a write to read-only category {Category}", category);
         throw new ArgumentException(
             $"Category '{category}' is read-only. Call request_write_permission for it before writing to any document in it.");
+    }
+
+    /// <summary>
+    /// Only a leaf holds documents, so a tool that names one document, lists them or writes them needs one.
+    /// Refusing a parent outright says so, where letting it through would only report the document missing.
+    /// </summary>
+    private async Task RequireLeafCategoryAsync(string category)
+    {
+        var subcategories = await _documents.GetSubcategoriesAsync(category);
+        if (subcategories.Count == 0) return;
+
+        throw new ArgumentException(
+            $"Category '{category}' is a parent category, not a leaf: this tool needs the full path of a category with " +
+            $"no subcategories under it. The leaf categories under '{category}' are: {string.Join(", ", subcategories)}.");
+    }
+
+    private async Task RequireNoAncestorHoldsDocumentsAsync(string category)
+    {
+        var ancestors = await _documents.GetAncestorsHoldingDocumentsAsync(category);
+        if (ancestors.Count == 0) return;
+
+        throw new ArgumentException(
+            $"Category '{category}' cannot hold documents, because '{ancestors[0]}' above it already does: a category " +
+            "holds either documents or subcategories, never both.");
     }
 
     private string ExecuteRollDice(Dictionary<string, object> arguments)
@@ -822,8 +919,17 @@ public class McpServer
 
     private static string DisplayName(string key) => char.ToUpperInvariant(key[0]) + key[1..];
 
-    private static string RequireCategory(Dictionary<string, object> arguments) =>
-        RequireString(arguments, "Category", maxLength: 200);
+    private static string RequireCategory(Dictionary<string, object> arguments)
+    {
+        var category = RequireString(arguments, "Category", maxLength: 200);
+
+        if (!CategoryPath.IsWellFormed(category))
+            throw new ArgumentException(
+                $"Category '{category}' is not a well-formed category path: its levels are separated by '{CategoryPath.Separator}', " +
+                "and none of them can be empty or start or end with a space.");
+
+        return category;
+    }
 
     private static string RequireString(Dictionary<string, object> arguments, string name, int maxLength)
     {
@@ -855,6 +961,14 @@ public class McpServer
             throw WrongType(DisplayName(key), $"the text \"{text}\"", expected);
 
         return Convert.ToBoolean(raw);
+    }
+
+    private static bool OptionalBool(Dictionary<string, object> arguments, string key, bool defaultValue)
+    {
+        if (!arguments.TryGetValue(key, out var raw) || raw == null || raw is JsonElement { ValueKind: JsonValueKind.Null })
+            return defaultValue;
+
+        return RequireBool(arguments, key);
     }
 
     private static string? OptionalString(Dictionary<string, object> arguments, string key, int maxLength)

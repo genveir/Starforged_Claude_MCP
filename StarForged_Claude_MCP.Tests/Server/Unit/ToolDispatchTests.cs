@@ -35,6 +35,17 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents, permissions) =>
                 embeddings.Verify(f => f.SearchAsync("derelict in the Forge", Category, 3), Times.Once)),
 
+        ["find_text"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["text"] = "Bluejay",
+                ["wholeWord"] = true,
+                ["filename"] = Filename
+            },
+            VerifyDispatch: (embeddings, documents, permissions) =>
+                documents.Verify(f => f.FindTextAsync(Category, "Bluejay", true, Filename), Times.Once)),
+
         ["retrieve_search_results"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["ids"] = new object[] { 7, 11 } },
             VerifyDispatch: (embeddings, documents, permissions) =>
@@ -298,6 +309,12 @@ public class ToolDispatchTests
             .ReturnsAsync(new DocumentIndexEntry());
         mock.Setup(f => f.GetDocumentIndexAsync(It.IsAny<string>()))
             .ReturnsAsync(new List<DocumentIndexEntry>());
+        mock.Setup(f => f.GetSubcategoriesAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+        mock.Setup(f => f.GetAncestorsHoldingDocumentsAsync(It.IsAny<string>()))
+            .ReturnsAsync(new List<string>());
+        mock.Setup(f => f.FindTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string?>()))
+            .ReturnsAsync(new TextSearchResult(TotalMatches: 0, Truncated: false, Documents: []));
         mock.Setup(f => f.GetCanonicalBeatsAsync(It.IsAny<string>(), It.IsAny<int>()))
             .ReturnsAsync(new List<Beat>());
 
