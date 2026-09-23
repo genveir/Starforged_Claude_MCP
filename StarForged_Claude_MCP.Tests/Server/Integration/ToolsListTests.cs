@@ -34,6 +34,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "add_document",
             "update_document",
             "replace_document_section",
+            "replace_section_text",
             "append_to_document",
             "delete_document_section",
             "index_document",

@@ -221,6 +221,25 @@ public class McpServer
             },
             new()
             {
+                Name = "replace_section_text",
+                Description = "Replaces every occurrence of a literal snippet of text within one section, leaving the rest of the section and the rest of the document untouched. Prefer this over replace_document_section for a small change, since only the changed snippet has to be written out rather than the whole section. Reports how many occurrences were replaced. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+                InputSchema = new
+                {
+                    type = "object",
+                    properties = new
+                    {
+                        category = new { type = "string", description = LeafCategoryDescription },
+                        filename = new { type = "string", description = "Filename of the document to edit" },
+                        section = new { type = "string", description = "The section to edit, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
+                        oldText = new { type = "string", description = "The exact text to find within that section, matched literally and case-sensitively. Every occurrence in the section is replaced. Refused if it does not appear in the section at all." },
+                        newText = new { type = "string", description = "The text to put in place of every occurrence of oldText. An empty string deletes oldText outright." },
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                    },
+                    required = new[] { "category", "filename", "section", "oldText", "newText" }
+                }
+            },
+            new()
+            {
                 Name = "append_to_document",
                 Description = "Adds text to the end of a document, or to the end of one of its sections, without rewriting what is already there. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
                 InputSchema = new
@@ -490,6 +509,7 @@ public class McpServer
             "add_document" => await ExecuteAddDocumentAsync(arguments),
             "update_document" => await ExecuteUpdateDocumentAsync(arguments),
             "replace_document_section" => await ExecuteReplaceDocumentSectionAsync(arguments),
+            "replace_section_text" => await ExecuteReplaceSectionTextAsync(arguments),
             "append_to_document" => await ExecuteAppendToDocumentAsync(arguments),
             "delete_document_section" => await ExecuteDeleteDocumentSectionAsync(arguments),
             "index_document" => await ExecuteIndexDocumentAsync(arguments),
@@ -622,6 +642,27 @@ public class McpServer
         var replaced = await _documents.ReplaceSectionAsync(category, filename, section, text, summary);
 
         return RequireDocumentWasFound(replaced, category, filename, message: "Section replaced successfully");
+    }
+
+    private async Task<string> ExecuteReplaceSectionTextAsync(Dictionary<string, object> arguments)
+    {
+        var category = RequireCategory(arguments);
+        var filename = RequireString(arguments, "Filename", maxLength: 500);
+        var section = RequireString(arguments, "Section", maxLength: 1_000);
+        var oldText = RequireString(arguments, "OldText", maxLength: 1_000_000);
+        var newText = RequireStringAllowingEmpty(arguments, "NewText", maxLength: 1_000_000);
+        var summary = OptionalSummary(arguments);
+        RequireWriteEnabled(category);
+
+        _logger.LogDebug("Executing replace_section_text: category={Category}, filename={Filename}, section={Section}, oldTextLength={OldTextLength}, newTextLength={NewTextLength}",
+            category, filename, section, oldText.Length, newText.Length);
+
+        var replacements = await _documents.ReplaceSectionTextAsync(category, filename, section, oldText, newText, summary);
+
+        if (replacements == null)
+            throw new ArgumentException($"No document named '{filename}' exists in category '{category}'.");
+
+        return JsonSerializer.Serialize(new { message = "Section text replaced successfully", replacements }, _jsonOptions);
     }
 
     private async Task<string> ExecuteAppendToDocumentAsync(Dictionary<string, object> arguments)
@@ -938,6 +979,21 @@ public class McpServer
 
         if (string.IsNullOrWhiteSpace(value))
             throw new ArgumentException($"{name} cannot be empty");
+        if (value.Length > maxLength)
+            throw new ArgumentException($"{name} exceeds maximum length of {maxLength:N0} characters");
+
+        return value;
+    }
+
+    /// <summary>
+    /// Like RequireString, but an empty value is allowed through rather than refused: newText is
+    /// required to be present, but an empty string is a legitimate way to delete oldText outright.
+    /// </summary>
+    private static string RequireStringAllowingEmpty(Dictionary<string, object> arguments, string name, int maxLength)
+    {
+        var key = char.ToLowerInvariant(name[0]) + name[1..];
+        var value = RequirePresent(arguments, key).ToString() ?? string.Empty;
+
         if (value.Length > maxLength)
             throw new ArgumentException($"{name} exceeds maximum length of {maxLength:N0} characters");
 

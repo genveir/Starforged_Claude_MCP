@@ -203,6 +203,184 @@ public class SectionEditingTests : McpServerTestBase
     }
 
     [Fact]
+    public async Task ReplaceSection_WithAnHtmlEscapedSeparator_ShouldBeRefusedAsMisformatted()
+    {
+        await StoreNestedDocument("103");
+
+        var replaced = await CallTool("104", "replace_document_section", Arguments(
+            ("section", "B &gt; C"),
+            ("text", Lines("## C", "", "rewritten C"))));
+
+        replaced.ShouldHaveBeenRefused().Should().Contain("&gt;").And.Contain("HTML-escaped",
+            because: "a model that sent '&gt;' instead of '>' needs to be told its input is misformatted, not that the section is missing");
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_ShouldReplaceEveryOccurrenceWithinTheSection_AndReportHowMany()
+    {
+        await ClearTestDocuments();
+        await StoreDocument("62", Lines(
+            "# B",
+            "",
+            "text B",
+            "",
+            "## C",
+            "",
+            "text C, more text C",
+            "",
+            "### D",
+            "",
+            "text D, referencing text C again",
+            "",
+            "## E",
+            "",
+            "text E"));
+
+        var replaced = await CallTool("63", "replace_section_text", Arguments(
+            ("section", "C"),
+            ("oldText", "text C"),
+            ("newText", "prose C")));
+
+        replaced.ShouldHaveSucceeded();
+        ToolPayload(replaced).GetProperty("replacements").GetInt32().Should().Be(3,
+            because: "'text C' appears twice in C's own prose and once more inside D, which is nested under it");
+
+        (await ReadContent("64")).Should().Be(Lines(
+            "# B",
+            "",
+            "text B",
+            "",
+            "## C",
+            "",
+            "prose C, more prose C",
+            "",
+            "### D",
+            "",
+            "text D, referencing prose C again",
+            "",
+            "## E",
+            "",
+            "text E"));
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_ShouldLeaveSiblingSectionsAlone()
+    {
+        await StoreNestedDocument("65");
+
+        var replaced = await CallTool("66", "replace_section_text", Arguments(
+            ("section", "E"),
+            ("oldText", "text E"),
+            ("newText", "rewritten E")));
+
+        replaced.ShouldHaveSucceeded();
+
+        (await ReadContent("67")).Should().Be(Lines(
+            "# B",
+            "",
+            "text B",
+            "",
+            "## C",
+            "",
+            "text C",
+            "",
+            "### D",
+            "",
+            "text D",
+            "",
+            "## E",
+            "",
+            "rewritten E"));
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_WhenOldTextIsNotInTheSection_ShouldBeRefused()
+    {
+        await StoreNestedDocument("68");
+
+        var replaced = await CallTool("69", "replace_section_text", Arguments(
+            ("section", "C"),
+            ("oldText", "nonexistent phrase"),
+            ("newText", "anything")));
+
+        replaced.ShouldHaveBeenRefused().Should().Contain("nonexistent phrase").And.Contain("was not found");
+
+        (await ReadContent("70")).Should().Be(Nested, because: "a refused edit must not have written anything");
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_WhenOldTextOnlyAppearsOutsideTheSection_ShouldBeRefused()
+    {
+        await StoreNestedDocument("71");
+
+        var replaced = await CallTool("72", "replace_section_text", Arguments(
+            ("section", "C"),
+            ("oldText", "text E"),
+            ("newText", "anything")));
+
+        replaced.ShouldHaveBeenRefused().Should().Contain("was not found");
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_WithAnEmptyNewText_ShouldDeleteOldTextOutright()
+    {
+        await StoreNestedDocument("73");
+
+        var replaced = await CallTool("74", "replace_section_text", Arguments(
+            ("section", "C"),
+            ("oldText", "text C"),
+            ("newText", "")));
+
+        replaced.ShouldHaveSucceeded();
+        (await ReadContent("75")).Should().Contain("## C").And.NotContain("text C");
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_IntroducingAShallowerHeader_ShouldBeRefused()
+    {
+        await StoreNestedDocument("76");
+
+        var replaced = await CallTool("77", "replace_section_text", Arguments(
+            ("section", "D"),
+            ("oldText", "text D"),
+            ("newText", "text D\n\n# A new top level")));
+
+        replaced.ShouldHaveBeenRefused().Should().Contain("would end the section");
+
+        (await ReadContent("78")).Should().Be(Nested);
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_WhenTheSectionIsMissing_ShouldReturnTheDocumentsSections()
+    {
+        await StoreNestedDocument("79");
+
+        var replaced = await CallTool("80", "replace_section_text", Arguments(
+            ("section", "Nowhere"),
+            ("oldText", "text"),
+            ("newText", "prose")));
+
+        replaced.ShouldHaveBeenRefused().Should().Contain("B > C > D").And.Contain("B > E");
+    }
+
+    [Fact]
+    public async Task ReplaceSectionText_WhenTheDocumentIsMissing_ShouldReturnError()
+    {
+        await ClearTestDocuments();
+
+        var response = await CallTool("81", "replace_section_text", new Dictionary<string, object>
+        {
+            ["category"] = Category,
+            ["filename"] = "never_stored.md",
+            ["section"] = "C",
+            ["oldText"] = "text",
+            ["newText"] = "prose"
+        });
+
+        response.ShouldHaveBeenRefused().Should().Contain("No document named");
+    }
+
+    [Fact]
     public async Task AppendToSection_ShouldLandAfterTheSectionsLastSubsection()
     {
         await StoreNestedDocument("27");

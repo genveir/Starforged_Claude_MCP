@@ -37,6 +37,10 @@ public class DocumentsFacade : IDocumentsFacade
         await WriteAsync(category, filename, summary,
             rewrite: existing => MarkdownSectionEditor.ReplaceSection(existing.Content, section, text));
 
+    public async Task<int?> ReplaceSectionTextAsync(string category, string filename, string section, string oldText, string newText, string? summary) =>
+        await WriteAsync(category, filename, summary,
+            rewrite: existing => MarkdownSectionEditor.ReplaceTextInSection(existing.Content, section, oldText, newText));
+
     public async Task<bool> AppendAsync(string category, string filename, string? section, string text, string? summary) =>
         await WriteAsync(category, filename, summary,
             rewrite: existing => MarkdownSectionEditor.AppendToSection(existing.Content, section, text));
@@ -118,6 +122,28 @@ public class DocumentsFacade : IDocumentsFacade
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Same write path as <see cref="WriteAsync(string,string,string?,Func{Document,string})"/>, for a
+    /// rewrite that also has to report something about the change it made, such as a replacement count.
+    /// </summary>
+    private async Task<TResult?> WriteAsync<TResult>(string category, string filename, string? summary, Func<Document, (string Content, TResult Result)> rewrite)
+        where TResult : struct
+    {
+        var existing = await _dbInterface.GetDocument(category, filename);
+        if (existing == null) return null;
+
+        var (content, result) = rewrite(existing);
+
+        await _dbInterface.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
+
+        if (existing.Indexed)
+        {
+            await _documentProcessing.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+        }
+
+        return result;
     }
 
     private static string? ResolveSummary(string? existingSummary, string? summary) =>

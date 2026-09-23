@@ -45,6 +45,17 @@ public class WritePermissionToolTests
             }
         },
         {
+            "replace_section_text",
+            new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["section"] = "Derelicts",
+                ["oldText"] = "drifts",
+                ["newText"] = "hangs derelict"
+            }
+        },
+        {
             "append_to_document",
             new Dictionary<string, object>
             {
@@ -240,6 +251,8 @@ public class WritePermissionToolTests
             .ReturnsAsync(true);
         mock.Setup(f => f.ReplaceSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
+        mock.Setup(f => f.ReplaceSectionTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(1);
         mock.Setup(f => f.AppendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))

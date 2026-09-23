@@ -26,6 +26,53 @@ public static class MarkdownSectionEditor
         return document.Join(kept);
     }
 
+    /// <summary>
+    /// Replaces every occurrence of a literal snippet within one section (header line included) and
+    /// reports how many were replaced. Unlike ReplaceSection, this leaves the rest of the section's
+    /// text untouched, so only the changed snippet has to be written out.
+    /// </summary>
+    public static (string Content, int Replacements) ReplaceTextInSection(string content, string section, string oldText, string newText)
+    {
+        if (string.IsNullOrEmpty(oldText))
+            throw new ArgumentException("oldText cannot be empty");
+
+        var document = MarkdownDocument.Parse(content);
+        var target = document.Find(section);
+
+        var lines = document.Lines;
+        var sectionText = string.Join('\n', lines[target.Start..target.End]);
+
+        var normalizedOldText = oldText.Replace("\r\n", "\n");
+        var normalizedNewText = newText.Replace("\r\n", "\n");
+
+        var replacements = CountOccurrences(sectionText, normalizedOldText);
+        if (replacements == 0)
+            throw new ArgumentException($"'{oldText}' was not found in section '{target.Path}'.");
+
+        var replacedText = sectionText.Replace(normalizedOldText, normalizedNewText);
+        document.RequireNoHeaderEscapes(replacedText, target, skipOwnHeader: true);
+
+        var kept = Prefix(lines, upTo: target.Start);
+        AppendBlock(kept, SplitLines(replacedText));
+        AppendTail(kept, lines, from: target.End);
+
+        return (document.Join(kept), replacements);
+    }
+
+    private static int CountOccurrences(string haystack, string needle)
+    {
+        var count = 0;
+        var index = 0;
+
+        while ((index = haystack.IndexOf(needle, index, StringComparison.Ordinal)) != -1)
+        {
+            count++;
+            index += needle.Length;
+        }
+
+        return count;
+    }
+
     public static string AppendToSection(string content, string? section, string addition)
     {
         var document = MarkdownDocument.Parse(content);
@@ -295,6 +342,11 @@ public static class MarkdownSectionEditor
 
         private static string[] SplitPath(string section)
         {
+            if (section.Contains("&gt;", StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException(
+                    $"'{section}' contains '&gt;', the HTML-escaped form of '>'. " +
+                    "Send a literal '>' between path segments instead, e.g. 'Parent > Child'.");
+
             var path = section
                 .Split(PathSeparator)
                 .Select(part => part.Trim().Trim('#').Trim())

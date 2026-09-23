@@ -86,6 +86,19 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.ReplaceSectionAsync(Category, Filename, Section, Text, Summary), Times.Once)),
 
+        ["replace_section_text"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["category"] = Category,
+                ["filename"] = Filename,
+                ["section"] = Section,
+                ["oldText"] = "drifts",
+                ["newText"] = "hangs derelict",
+                ["summary"] = Summary
+            },
+            VerifyDispatch: (embeddings, documents, permissions) =>
+                documents.Verify(f => f.ReplaceSectionTextAsync(Category, Filename, Section, "drifts", "hangs derelict", Summary), Times.Once)),
+
         ["append_to_document"] = new ToolCase(
             Arguments: new Dictionary<string, object>
             {
@@ -293,6 +306,8 @@ public class ToolDispatchTests
             .ReturnsAsync(true);
         mock.Setup(f => f.ReplaceSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
+        mock.Setup(f => f.ReplaceSectionTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+            .ReturnsAsync(1);
         mock.Setup(f => f.AppendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))

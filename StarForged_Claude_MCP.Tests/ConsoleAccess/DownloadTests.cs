@@ -56,6 +56,24 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task DownloadFolder_ShouldReportHowManyFilesWereNewAndHowManyOverwritten()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Db.StoreDocument(Category, "three.md", "Third content.", summary: null);
+        folder.Write("one.md", "Local content.");
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
+
+        output.Should().Contain($"{Path.Combine(folder.Path, "one.md")} (overwritten)");
+        output.Should().Contain($"{Path.Combine(folder.Path, "two.md")} (new)");
+        output.Should().Contain("Downloaded 3 document(s)").And.Contain("2 new, 1 overwritten.");
+    }
+
+    [Fact]
     public async Task DownloadDocument_ToAFilePath_ShouldWriteOnlyThatDocumentThere()
     {
         await ClearTestDocuments();
@@ -116,6 +134,20 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task DownloadDocument_ShouldReportWhetherTheFileWasNewOrOverwritten()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        var target = Path.Combine(folder.Path, "ship.md");
+        var options = new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md", Overwrite: true);
+
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (new)");
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (overwritten)");
+    }
+
+    [Fact]
     public async Task DownloadDocument_WhenTheDocumentDoesNotExist_ShouldWriteNothing()
     {
         await ClearTestDocuments();
@@ -164,6 +196,20 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task DownloadBeats_ShouldReportWhetherTheFileWasNewOrOverwritten()
+    {
+        await ClearTestBeats();
+        using var folder = new TempFolder();
+
+        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The arrival.");
+        var target = Path.Combine(folder.Path, "session3.md");
+        var options = new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true);
+
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (new).");
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (overwritten).");
+    }
+
+    [Fact]
     public async Task DownloadBeats_WhenTheSessionHasNoBeats_ShouldWriteNothing()
     {
         await ClearTestBeats();
@@ -177,4 +223,22 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
     private async Task Download(DownloadOptions options) =>
         await new FileDownloader(Db).DownloadFile(options);
+
+    private async Task<string> DownloadCapturingOutput(DownloadOptions options)
+    {
+        var original = Console.Out;
+        using var output = new StringWriter();
+        Console.SetOut(output);
+
+        try
+        {
+            await Download(options);
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
+        return output.ToString();
+    }
 }

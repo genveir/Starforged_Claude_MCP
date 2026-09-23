@@ -15,6 +15,12 @@ public interface IDocumentsFacade
 
     Task<bool> ReplaceSectionAsync(string category, string filename, string section, string text, string? summary);
 
+    /// <summary>
+    /// Replaces every occurrence of oldText within one section. Null when the document does not exist;
+    /// otherwise the number of occurrences replaced.
+    /// </summary>
+    Task<int?> ReplaceSectionTextAsync(string category, string filename, string section, string oldText, string newText, string? summary);
+
     Task<bool> AppendAsync(string category, string filename, string? section, string text, string? summary);
 
     Task<bool> DeleteSectionAsync(string category, string filename, string section, string? summary);
