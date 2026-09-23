@@ -42,7 +42,8 @@ public class FileDownloader
             return;
         }
 
-        int written = 0;
+        int created = 0;
+        int overwritten = 0;
         int skipped = 0;
 
         foreach (var entry in index)
@@ -59,12 +60,15 @@ public class FileDownloader
             var document = await dbInterface.GetDocument(category, entry.Filename);
             if (document == null) continue;
 
-            await WriteAsync(path, document.Content);
-            Console.WriteLine($"{entry.Filename} -> {path}");
-            written++;
+            var replacedExisting = await WriteAsync(path, document.Content);
+            Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(replacedExisting)}");
+            if (replacedExisting) overwritten++;
+            else created++;
         }
 
-        Console.WriteLine($"Downloaded {written} document(s) from category '{category}' to {folderPath}.");
+        Console.WriteLine(
+            $"Downloaded {created + overwritten} document(s) from category '{category}' to {folderPath}: " +
+            $"{created} new, {overwritten} overwritten.");
         if (skipped > 0)
         {
             Console.WriteLine($"Skipped {skipped} existing file(s); pass --overwrite to replace them.");
@@ -87,8 +91,8 @@ public class FileDownloader
 
         if (!CanWrite(path, overwrite)) return;
 
-        await WriteAsync(path, document.Content);
-        Console.WriteLine($"{filename} -> {path}");
+        var replacedExisting = await WriteAsync(path, document.Content);
+        Console.WriteLine($"{filename} -> {path} {DescribeWrite(replacedExisting)}");
     }
 
     private async Task DownloadBeatsAsync(string category, int sessionNumber, string path, bool overwrite)
@@ -106,8 +110,8 @@ public class FileDownloader
         var separator = Environment.NewLine + Environment.NewLine;
         var content = string.Join(separator, beats.Select(b => b.Content.TrimEnd())) + Environment.NewLine;
 
-        await WriteAsync(path, content);
-        Console.WriteLine($"Downloaded {beats.Count} beat(s) of session {sessionNumber} to {path}.");
+        var replacedExisting = await WriteAsync(path, content);
+        Console.WriteLine($"Downloaded {beats.Count} beat(s) of session {sessionNumber} to {path} {DescribeWrite(replacedExisting)}.");
     }
 
     private static bool CanWrite(string path, bool overwrite)
@@ -118,13 +122,19 @@ public class FileDownloader
         return false;
     }
 
-    private static async Task WriteAsync(string path, string content)
+    /// <returns>Whether an existing file was replaced, as opposed to a new one being created.</returns>
+    private static async Task<bool> WriteAsync(string path, string content)
     {
+        var replacedExisting = File.Exists(path);
+
         var directory = Path.GetDirectoryName(Path.GetFullPath(path));
         if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
 
         await File.WriteAllTextAsync(path, content);
+        return replacedExisting;
     }
+
+    private static string DescribeWrite(bool replacedExisting) => replacedExisting ? "(overwritten)" : "(new)";
 
     private static bool IsFolderPath(string path) =>
         Directory.Exists(path)
