@@ -189,6 +189,85 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         (await Db.GetDocumentIndex("Campaign.Oracles.Moons")).Should().BeEmpty();
     }
 
+    [Fact]
+    public async Task UploadFolder_WithSubfolders_ShouldStoreEachAsANestedSubcategory()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write(Path.Combine("Oracles", "moves.md"), Markdown("Moves", "The moves."));
+        folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), Markdown("Kira", "An ally."));
+        folder.Write(Path.Combine("Npcs", "Rivals", "vex.md"), Markdown("Vex", "A rival."));
+
+        await Upload(folder, SummaryMode.None);
+
+        (await Db.GetCategoriesUnder(Category)).Should().Equal(
+            $"{Category}.Npcs.Allies", $"{Category}.Npcs.Rivals", $"{Category}.Oracles");
+        (await Db.GetDocument($"{Category}.Npcs.Allies", "kira.md"))!.Content.Should().Contain("An ally.");
+        (await Db.GetDocumentIndex(Category)).Should().BeEmpty(because: "the root folder held only subfolders");
+    }
+
+    [Fact]
+    public async Task UploadFolder_ShouldSkipFoldersStartingWithAPeriodAndFoldersWithoutMarkdown()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("notes.md", Markdown("Notes", "The notes."));
+        folder.Write(Path.Combine(".git", "description.md"), "Not part of the upload.");
+        folder.Write(Path.Combine("images", "map.png"), "Not markdown.");
+
+        await Upload(folder, SummaryMode.None);
+
+        (await Db.GetCategoriesUnder(Category)).Should().BeEmpty();
+        (await Db.GetDocumentIndex(Category)).Select(entry => entry.Filename).Should().Equal("notes.md");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WhenAFolderHoldsBothFilesAndSubfolders_ShouldStoreNothing()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write(Path.Combine("Oracles", "moves.md"), Markdown("Moves", "The moves."));
+        folder.Write(Path.Combine("Npcs", "overview.md"), Markdown("Overview", "Everyone."));
+        folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), Markdown("Kira", "An ally."));
+
+        await Upload(folder, SummaryMode.None);
+
+        (await Db.GetCategoriesUnder(Category)).Should().BeEmpty(because: "the whole folder is checked before anything is written");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WhenASubfolderNameContainsAPeriod_ShouldStoreNothing()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write(Path.Combine("Oracles", "moves.md"), Markdown("Moves", "The moves."));
+        folder.Write(Path.Combine("v1.2", "notes.md"), Markdown("Notes", "The notes."));
+
+        await Upload(folder, SummaryMode.None);
+
+        (await Db.GetCategoriesUnder(Category)).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task UploadFolder_WhenASubfolderClashesWithStoredCategories_ShouldStoreNothing()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        folder.Write(Path.Combine("Oracles", "moves.md"), Markdown("Moves", "The moves."));
+        folder.Write(Path.Combine("Npcs", "vex.md"), Markdown("Vex", "A rival."));
+
+        await Upload(folder, SummaryMode.None);
+
+        (await Db.GetCategoriesUnder(Category)).Should().Equal(
+            [$"{Category}.Npcs.Allies"], because: "'Npcs' is already a parent category, so nothing is written");
+    }
+
     private static string Markdown(string header, string body) =>
         $"# {header}{Environment.NewLine}{Environment.NewLine}{body}";
 

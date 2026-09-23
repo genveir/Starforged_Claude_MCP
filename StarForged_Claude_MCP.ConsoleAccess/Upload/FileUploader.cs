@@ -39,21 +39,17 @@ public class FileUploader
             return;
         }
 
-        var categoryAccepted = options.Mode == UploadMode.Beats
-            ? await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)
-            : await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category);
-        if (!categoryAccepted) return;
-
         switch (options.Mode)
         {
             case UploadMode.Folder:
-                var files = Directory.GetFiles(options.SourcePath!, "*.md", SearchOption.AllDirectories);
-                await UploadFilesAsync(options.Category, files, options.Indexed, options.Summaries);
+                await UploadFolderAsync(options.Category, options.SourcePath!, options.Indexed, options.Summaries);
                 break;
             case UploadMode.Document:
+                if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
                 await UploadFilesAsync(options.Category, [options.SourcePath!], options.Indexed, options.Summaries);
                 break;
             case UploadMode.Beats:
+                if (!await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)) return;
                 await RunBeatsAsync(options.Category, options.SessionNumber, cancellationToken);
                 break;
             default:
@@ -61,9 +57,91 @@ public class FileUploader
         }
     }
 
-    private async Task UploadFilesAsync(string category, string[] files, bool indexed, SummaryMode summaries)
+    /// <summary>
+    /// Stores the .md files of <paramref name="folderPath"/> under <paramref name="category"/>. Each subfolder
+    /// becomes a subcategory, at any depth, so 'Oracles/moves.md' is stored in '{category}.Oracles'. The whole
+    /// folder is checked before anything is written, so a folder that breaks the category hierarchy stores nothing.
+    /// </summary>
+    private async Task UploadFolderAsync(string category, string folderPath, bool indexed, SummaryMode summaries)
     {
-        Console.WriteLine($"Found {files.Length} file(s) to process.");
+        var leaves = new List<LeafUpload>();
+        if (!TryPlanFolder(category, folderPath, leaves)) return;
+
+        if (leaves.Count == 0)
+        {
+            Console.Error.WriteLine($"No .md files found in '{folderPath}'.");
+            return;
+        }
+
+        foreach (var leaf in leaves)
+        {
+            if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, leaf.Category)) return;
+        }
+
+        if (leaves is [var only] && only.Category == category)
+        {
+            await UploadFilesAsync(category, only.Files, indexed, summaries);
+            return;
+        }
+
+        var total = new UploadTally();
+        foreach (var leaf in leaves)
+        {
+            total += await UploadFilesAsync(leaf.Category, leaf.Files, indexed, summaries);
+        }
+
+        Console.WriteLine(
+            $"\nUploaded to {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} under '{category}': " +
+            $"{total.Stored} stored, {total.Replaced} replaced.");
+    }
+
+    /// <summary>
+    /// Adds a <see cref="LeafUpload"/> to <paramref name="leaves"/> for every folder that holds .md files, walking
+    /// every subfolder whose name does not start with a period. Subfolders without any .md files in them are
+    /// ignored. Reports the first folder that cannot become a category on stderr and returns false.
+    /// </summary>
+    private static bool TryPlanFolder(string category, string folderPath, List<LeafUpload> leaves)
+    {
+        var leavesBefore = leaves.Count;
+
+        var subfolders = Directory.GetDirectories(folderPath)
+            .Where(subfolder => !Path.GetFileName(subfolder).StartsWith('.'))
+            .OrderBy(subfolder => subfolder, StringComparer.OrdinalIgnoreCase);
+
+        foreach (var subfolder in subfolders)
+        {
+            var name = Path.GetFileName(subfolder);
+            var leavesBeforeSubfolder = leaves.Count;
+
+            if (!TryPlanFolder($"{category}{CategoryPath.Separator}{name}", subfolder, leaves)) return false;
+
+            var becomesCategory = leaves.Count > leavesBeforeSubfolder;
+            if (becomesCategory && (name.Contains(CategoryPath.Separator) || !CategoryPath.IsWellFormed(name)))
+            {
+                Console.Error.WriteLine(
+                    $"Error: the folder '{subfolder}' cannot be a category; its name may not contain '{CategoryPath.Separator}'.");
+                return false;
+            }
+        }
+
+        var files = Directory.GetFiles(folderPath, "*.md");
+        if (files.Length == 0) return true;
+
+        if (leaves.Count > leavesBefore)
+        {
+            Console.Error.WriteLine(
+                $"Error: '{folderPath}' holds both .md files and subfolders with .md files; " +
+                "a category holds either documents or subcategories, never both.");
+            return false;
+        }
+
+        leaves.Add(new LeafUpload(category, files));
+        return true;
+    }
+
+    private async Task<UploadTally> UploadFilesAsync(string category, string[] files, bool indexed, SummaryMode summaries)
+    {
+        Console.WriteLine($"Found {files.Length} file(s) to process for '{category}'.");
 
         var stored = 0;
         var replaced = 0;
@@ -95,7 +173,8 @@ public class FileUploader
             }
         }
 
-        Console.WriteLine($"\nCompleted! {stored} document(s) stored, {replaced} replaced.");
+        Console.WriteLine($"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced.");
+        return new UploadTally(stored, replaced);
     }
 
     private async Task RunBeatsAsync(string category, int sessionNumber, CancellationToken cancellationToken)
@@ -265,5 +344,13 @@ public class FileUploader
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    private sealed record LeafUpload(string Category, string[] Files);
+
+    private readonly record struct UploadTally(int Stored, int Replaced)
+    {
+        public static UploadTally operator +(UploadTally left, UploadTally right) =>
+            new(left.Stored + right.Stored, left.Replaced + right.Replaced);
     }
 }

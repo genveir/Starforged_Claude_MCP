@@ -117,7 +117,8 @@ public record UploadOptions(
         Console.WriteLine("Upload Options:");
         Console.WriteLine("  <category>              Category everything in this run is stored under (required)");
         Console.WriteLine("  -f, --folder <path>     Stores every .md file in the folder as a document, replacing");
-        Console.WriteLine("                          any already stored under the same filename");
+        Console.WriteLine("                          any already stored under the same filename; each subfolder");
+        Console.WriteLine("                          becomes a subcategory, and folders starting with '.' are skipped");
         Console.WriteLine("  -d, --document <path>   Stores a single file as a document, replacing any already");
         Console.WriteLine("                          stored under the same filename");
         Console.WriteLine("  -b, --beats <session>   Reads session beats from stdin; ctrl+Z undoes the last one");
