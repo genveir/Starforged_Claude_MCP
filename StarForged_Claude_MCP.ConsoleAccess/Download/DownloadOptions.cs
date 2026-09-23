@@ -84,7 +84,8 @@ public record DownloadOptions(
         Console.WriteLine("Download Options:");
         Console.WriteLine("  <category>              The category to download from (required)");
         Console.WriteLine("  <path>                  Where to write to (required); see each mode below");
-        Console.WriteLine("  -f, --folder            Writes every document in the category into <path> as a folder");
+        Console.WriteLine("  -f, --folder            Writes every document in the category into <path> as a folder; for a");
+        Console.WriteLine("                          parent category, each leaf under it gets its own nested folder");
         Console.WriteLine("  -d, --document <name>   Writes one document to the file <path>; if <path> is a folder");
         Console.WriteLine("                          (existing, or ending in a slash) it is written under its own name");
         Console.WriteLine("  -b, --beats <session>   Writes the session's canonical beats to the file <path>");

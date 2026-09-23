@@ -1,4 +1,5 @@
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
@@ -32,19 +33,51 @@ public class FileDownloader
 
     private async Task DownloadFolderAsync(string category, string folderPath, bool overwrite)
     {
-        var index = await dbInterface.GetDocumentIndex(category);
+        var leaves = await dbInterface.GetCategoriesUnder(category);
+        if (leaves.Count > 0)
+        {
+            await DownloadParentAsync(category, leaves, folderPath, overwrite);
+            return;
+        }
 
+        var index = await dbInterface.GetDocumentIndex(category);
         if (index.Count == 0)
         {
-            if (!await CategoryHierarchy.RequireLeaf(dbInterface, category)) return;
-
             Console.Error.WriteLine($"No documents found for category '{category}'.");
             return;
         }
 
-        int created = 0;
-        int overwritten = 0;
-        int skipped = 0;
+        var tally = await DownloadLeafAsync(category, index, folderPath, overwrite);
+        ReportSkipped(tally.Skipped);
+    }
+
+    /// <summary>
+    /// Downloads every leaf under <paramref name="category"/> into its own folder, nested to mirror the category
+    /// tree: leaf 'Campaign.Npcs.Allies' under 'Campaign' goes to 'Npcs/Allies' inside <paramref name="folderPath"/>.
+    /// </summary>
+    private async Task DownloadParentAsync(string category, List<string> leaves, string folderPath, bool overwrite)
+    {
+        var total = new DownloadTally();
+
+        foreach (var leaf in leaves)
+        {
+            var relativeSegments = leaf[(category.Length + 1)..].Split(CategoryPath.Separator).Select(SanitiseFileName);
+            var leafFolder = Path.Combine([folderPath, .. relativeSegments]);
+
+            var index = await dbInterface.GetDocumentIndex(leaf);
+            total += await DownloadLeafAsync(leaf, index, leafFolder, overwrite);
+        }
+
+        Console.WriteLine(
+            $"Downloaded {total.Written} document(s) from {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} " +
+            $"under '{category}' to {folderPath}: {total.Created} new, {total.Overwritten} overwritten.");
+        ReportSkipped(total.Skipped);
+    }
+
+    private async Task<DownloadTally> DownloadLeafAsync(
+        string category, List<DocumentIndexEntry> index, string folderPath, bool overwrite)
+    {
+        var tally = new DownloadTally();
 
         foreach (var entry in index)
         {
@@ -53,7 +86,7 @@ public class FileDownloader
             if (File.Exists(path) && !overwrite)
             {
                 Console.Error.WriteLine($"Skipped (already exists): {path}");
-                skipped++;
+                tally = tally with { Skipped = tally.Skipped + 1 };
                 continue;
             }
 
@@ -62,13 +95,19 @@ public class FileDownloader
 
             var replacedExisting = await WriteAsync(path, document.Content);
             Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(replacedExisting)}");
-            if (replacedExisting) overwritten++;
-            else created++;
+            tally = replacedExisting
+                ? tally with { Overwritten = tally.Overwritten + 1 }
+                : tally with { Created = tally.Created + 1 };
         }
 
         Console.WriteLine(
-            $"Downloaded {created + overwritten} document(s) from category '{category}' to {folderPath}: " +
-            $"{created} new, {overwritten} overwritten.");
+            $"Downloaded {tally.Written} document(s) from category '{category}' to {folderPath}: " +
+            $"{tally.Created} new, {tally.Overwritten} overwritten.");
+        return tally;
+    }
+
+    private static void ReportSkipped(int skipped)
+    {
         if (skipped > 0)
         {
             Console.WriteLine($"Skipped {skipped} existing file(s); pass --overwrite to replace them.");
@@ -145,5 +184,15 @@ public class FileDownloader
     {
         var sanitised = string.Concat(filename.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         return string.IsNullOrWhiteSpace(sanitised) ? "untitled" : sanitised;
+    }
+
+    private readonly record struct DownloadTally(int Created, int Overwritten, int Skipped)
+    {
+        public int Written => Created + Overwritten;
+
+        public static DownloadTally operator +(DownloadTally left, DownloadTally right) => new(
+            left.Created + right.Created,
+            left.Overwritten + right.Overwritten,
+            left.Skipped + right.Skipped);
     }
 }

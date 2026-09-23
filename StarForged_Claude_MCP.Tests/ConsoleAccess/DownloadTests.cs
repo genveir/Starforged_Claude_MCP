@@ -74,6 +74,49 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task DownloadFolder_OfAParentCategory_ShouldWriteEachLeafIntoItsOwnNestedFolder()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs.Rivals", "vex.md", "Vex.", summary: null);
+        await Db.StoreDocument("some_other_category", "other.md", "Not under this parent.", summary: null);
+
+        await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
+
+        Directory.GetFiles(folder.Path, "*", SearchOption.AllDirectories)
+            .Select(path => Path.GetRelativePath(folder.Path, path))
+            .Should().BeEquivalentTo([
+                Path.Combine("Oracles", "moves.md"),
+                Path.Combine("Npcs", "Allies", "kira.md"),
+                Path.Combine("Npcs", "Rivals", "vex.md")]);
+        File.ReadAllText(Path.Combine(folder.Path, "Npcs", "Allies", "kira.md")).Should().Be("Kira.");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_OfAParentCategory_ShouldReportTotalsAcrossEveryLeaf()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "tam.md", "Tam.", summary: null);
+        folder.Write(Path.Combine("Oracles", "moves.md"), "Local moves.");
+        folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), "Local Kira.");
+
+        var withoutOverwrite = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
+        withoutOverwrite.Should().Contain("Downloaded 1 document(s) from 2 categories").And.Contain("1 new, 0 overwritten.");
+        withoutOverwrite.Should().Contain("Skipped 2 existing file(s)");
+
+        var withOverwrite = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
+        withOverwrite.Should().Contain("Downloaded 3 document(s) from 2 categories").And.Contain("0 new, 3 overwritten.");
+        File.ReadAllText(Path.Combine(folder.Path, "Oracles", "moves.md")).Should().Be("The moves.");
+    }
+
+    [Fact]
     public async Task DownloadDocument_ToAFilePath_ShouldWriteOnlyThatDocumentThere()
     {
         await ClearTestDocuments();

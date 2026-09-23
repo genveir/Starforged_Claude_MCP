@@ -7,8 +7,12 @@ internal sealed class TempFolder : IDisposable
 
     public TempFolder() => Directory.CreateDirectory(Path);
 
-    public void Write(string filename, string content) =>
-        File.WriteAllText(System.IO.Path.Combine(Path, filename), content);
+    public void Write(string filename, string content)
+    {
+        var path = System.IO.Path.Combine(Path, filename);
+        Directory.CreateDirectory(System.IO.Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+    }
 
     public void Dispose()
     {
