@@ -17,6 +17,7 @@ public class ServiceRegistrationTests
     [InlineData(typeof(DocumentPrinter))]
     [InlineData(typeof(Searcher))]
     [InlineData(typeof(ISummaryPrompt))]
+    [InlineData(typeof(IConfirmPrompt))]
     public void EveryConsoleCommand_ShouldResolveFromTheConfiguredContainer(Type service)
     {
         using var provider = BuildProvider();

@@ -92,7 +92,7 @@ public class FileUploader
 
         Console.WriteLine(
             $"\nUploaded to {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} under '{category}': " +
-            $"{total.Stored} stored, {total.Replaced} replaced.");
+            $"{total.Stored} stored, {total.Replaced} replaced, {total.Unchanged} unchanged.");
     }
 
     /// <summary>
@@ -145,6 +145,7 @@ public class FileUploader
 
         var stored = 0;
         var replaced = 0;
+        var unchanged = 0;
 
         foreach (var filePath in files)
         {
@@ -167,14 +168,23 @@ public class FileUploader
             }
             else
             {
-                await ReplaceDocumentAsync(existing, text, summary, indexed);
-                Console.WriteLine(indexed ? "  Replaced and reindexed." : "  Replaced.");
-                replaced++;
+                var changes = await ReplaceDocumentAsync(existing, text, summary, indexed);
+                if (changes.Count == 0)
+                {
+                    Console.WriteLine("  Unchanged.");
+                    unchanged++;
+                }
+                else
+                {
+                    Console.WriteLine($"  Replaced: {string.Join(", ", changes)}.");
+                    replaced++;
+                }
             }
         }
 
-        Console.WriteLine($"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced.");
-        return new UploadTally(stored, replaced);
+        Console.WriteLine(
+            $"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced, {unchanged} unchanged.");
+        return new UploadTally(stored, replaced, unchanged);
     }
 
     private async Task RunBeatsAsync(string category, int sessionNumber, CancellationToken cancellationToken)
@@ -220,18 +230,37 @@ public class FileUploader
         return id;
     }
 
-    private async Task ReplaceDocumentAsync(Document existing, string content, string? summary, bool indexed)
+    /// <summary>
+    /// Brings <paramref name="existing"/> in line with the given content, summary and index state, writing only
+    /// what differs: the index is rebuilt only when the content changed or the document was not indexed before.
+    /// </summary>
+    /// <returns>A description of each change made; empty when the document already matched.</returns>
+    private async Task<List<string>> ReplaceDocumentAsync(Document existing, string content, string? summary, bool indexed)
     {
-        await dbInterface.UpdateDocument(existing.Id, content, summary);
+        var changes = new List<string>();
+        var contentChanged = existing.Content != content;
+        var summaryChanged = existing.Summary != summary;
 
-        if (indexed)
+        if (contentChanged) changes.Add("content changed");
+        if (summaryChanged) changes.Add("summary changed");
+
+        if (contentChanged || summaryChanged)
+        {
+            await dbInterface.UpdateDocument(existing.Id, content, summary);
+        }
+
+        if (indexed && (contentChanged || !existing.Indexed))
         {
             await documentProcessingService.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+            changes.Add(existing.Indexed ? "reindexed" : "indexed");
         }
-        else
+        else if (!indexed && existing.Indexed)
         {
             await documentProcessingService.RemoveIndexForDocumentAsync(existing.Id);
+            changes.Add("removed from index");
         }
+
+        return changes;
     }
 
     private async Task<string> FormatLoggedBeatsAsync(string category, int sessionNumber)
@@ -348,9 +377,9 @@ public class FileUploader
 
     private sealed record LeafUpload(string Category, string[] Files);
 
-    private readonly record struct UploadTally(int Stored, int Replaced)
+    private readonly record struct UploadTally(int Stored, int Replaced, int Unchanged)
     {
         public static UploadTally operator +(UploadTally left, UploadTally right) =>
-            new(left.Stored + right.Stored, left.Replaced + right.Replaced);
+            new(left.Stored + right.Stored, left.Replaced + right.Replaced, left.Unchanged + right.Unchanged);
     }
 }

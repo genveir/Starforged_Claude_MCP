@@ -8,7 +8,8 @@ public record DownloadOptions(
     DownloadMode Mode,
     string? Filename = null,
     int SessionNumber = 0,
-    bool Overwrite = false) : IConsoleAccessOptions
+    bool Overwrite = false,
+    bool Clean = false) : IConsoleAccessOptions
 {
     public static DownloadOptions? Parse(string[] args)
     {
@@ -32,6 +33,7 @@ public record DownloadOptions(
         string? filename = null;
         int sessionNumber = 0;
         bool overwrite = false;
+        bool clean = false;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -61,6 +63,10 @@ public record DownloadOptions(
                 case "-o":
                     overwrite = true;
                     break;
+                case "--clean":
+                case "-c":
+                    clean = true;
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
@@ -74,7 +80,14 @@ public record DownloadOptions(
             return null;
         }
 
-        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite);
+        if (clean && mode != DownloadMode.Folder)
+        {
+            Console.Error.WriteLine("Error: --clean only works with --folder.");
+            PrintUsage();
+            return null;
+        }
+
+        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean);
     }
 
     public static void PrintUsage()
@@ -90,5 +103,8 @@ public record DownloadOptions(
         Console.WriteLine("                          (existing, or ending in a slash) it is written under its own name");
         Console.WriteLine("  -b, --beats <session>   Writes the session's canonical beats to the file <path>");
         Console.WriteLine("  -o, --overwrite         Replace existing files instead of skipping them");
+        Console.WriteLine("  -c, --clean             With --folder: delete the .md files in <path> that are not part of the");
+        Console.WriteLine("                          download, after listing them and asking; folders starting with a");
+        Console.WriteLine("                          period are left alone");
     }
 }

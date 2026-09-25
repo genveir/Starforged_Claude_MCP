@@ -70,7 +70,48 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         output.Should().Contain($"{Path.Combine(folder.Path, "one.md")} (overwritten)");
         output.Should().Contain($"{Path.Combine(folder.Path, "two.md")} (new)");
-        output.Should().Contain("Downloaded 3 document(s)").And.Contain("2 new, 1 overwritten.");
+        output.Should().Contain("Downloaded 3 document(s)").And.Contain("2 new, 1 overwritten, 0 unchanged.");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithOverwrite_WhenAFileIsIdentical_ShouldLeaveItUntouchedAndReportItUnchanged()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        folder.Write("one.md", "Stored content.");
+        folder.Write("two.md", "Local content.");
+
+        var identical = Path.Combine(folder.Path, "one.md");
+        var longAgo = new DateTime(2000, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        File.SetLastWriteTimeUtc(identical, longAgo);
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
+
+        output.Should().Contain($"{identical} (unchanged)");
+        output.Should().Contain("Downloaded 1 document(s)").And.Contain("0 new, 1 overwritten, 1 unchanged.");
+        File.GetLastWriteTimeUtc(identical).Should().Be(longAgo, because: "an identical file is not rewritten");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithoutOverwrite_ShouldCountIdenticalFilesAsUnchangedAndOnlySkipDifferingOnes()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        folder.Write("one.md", "Stored content.");
+        folder.Write("two.md", "Local content.");
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
+
+        output.Should().Contain($"{Path.Combine(folder.Path, "one.md")} (unchanged)");
+        output.Should().Contain("0 new, 0 overwritten, 1 unchanged.");
+        output.Should().Contain("Skipped 1 existing file(s) that differ from the stored version");
+        File.ReadAllText(Path.Combine(folder.Path, "two.md")).Should().Be("Local content.");
     }
 
     [Fact]
@@ -108,11 +149,12 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), "Local Kira.");
 
         var withoutOverwrite = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
-        withoutOverwrite.Should().Contain("Downloaded 1 document(s) from 2 categories").And.Contain("1 new, 0 overwritten.");
+        withoutOverwrite.Should().Contain("Downloaded 1 document(s) from 2 categories").And.Contain("1 new, 0 overwritten, 0 unchanged.");
         withoutOverwrite.Should().Contain("Skipped 2 existing file(s)");
 
         var withOverwrite = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
-        withOverwrite.Should().Contain("Downloaded 3 document(s) from 2 categories").And.Contain("0 new, 3 overwritten.");
+        withOverwrite.Should().Contain("Downloaded 2 document(s) from 2 categories").And.Contain("0 new, 2 overwritten, 1 unchanged.",
+            because: "tam.md was already written by the first download");
         File.ReadAllText(Path.Combine(folder.Path, "Oracles", "moves.md")).Should().Be("The moves.");
     }
 
@@ -177,7 +219,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task DownloadDocument_ShouldReportWhetherTheFileWasNewOrOverwritten()
+    public async Task DownloadDocument_ShouldReportWhetherTheFileWasNewOverwrittenOrUnchanged()
     {
         await ClearTestDocuments();
         using var folder = new TempFolder();
@@ -187,7 +229,25 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         var options = new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md", Overwrite: true);
 
         (await DownloadCapturingOutput(options)).Should().Contain($"{target} (new)");
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (unchanged)");
+
+        folder.Write("ship.md", "Local content.");
         (await DownloadCapturingOutput(options)).Should().Contain($"{target} (overwritten)");
+    }
+
+    [Fact]
+    public async Task DownloadDocument_WithoutOverwrite_WhenTheFileIsIdentical_ShouldReportItUnchanged()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        folder.Write("ship.md", "The ship.");
+        var target = Path.Combine(folder.Path, "ship.md");
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md"));
+
+        output.Should().Contain($"{target} (unchanged)", because: "an identical file is not a conflict that needs --overwrite");
     }
 
     [Fact]
@@ -239,7 +299,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task DownloadBeats_ShouldReportWhetherTheFileWasNewOrOverwritten()
+    public async Task DownloadBeats_ShouldReportWhetherTheFileWasNewOverwrittenOrUnchanged()
     {
         await ClearTestBeats();
         using var folder = new TempFolder();
@@ -249,6 +309,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         var options = new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true);
 
         (await DownloadCapturingOutput(options)).Should().Contain($"{target} (new).");
+        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (unchanged).");
+
+        folder.Write("session3.md", "Local content.");
         (await DownloadCapturingOutput(options)).Should().Contain($"{target} (overwritten).");
     }
 
@@ -264,8 +327,108 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         File.Exists(target).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task DownloadFolder_WithClean_ShouldListAndDeleteOnlyStrayMarkdownOnceConfirmed()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        folder.Write("stray.md", "Not in the store.");
+        folder.Write(Path.Combine("Old", "Deep", "gone.md"), "Not in the store.");
+        folder.Write("map.png", "Not markdown.");
+        folder.Write(Path.Combine(".obsidian", "workspace.md"), "Inside a dot-folder.");
+        confirmPrompt.Answer = true;
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Clean: true));
+
+        confirmPrompt.Asked.Should().ContainSingle();
+        output.Should().Contain("  stray.md").And.Contain($"  {Path.Combine("Old", "Deep", "gone.md")}");
+        output.Should().Contain("Deleted 2 file(s) not in the download, and 2 folder(s) left empty.");
+
+        File.Exists(Path.Combine(folder.Path, "stray.md")).Should().BeFalse();
+        Directory.Exists(Path.Combine(folder.Path, "Old")).Should().BeFalse(because: "folders emptied by the clean are removed");
+        File.ReadAllText(Path.Combine(folder.Path, "one.md")).Should().Be("Stored content.");
+        File.Exists(Path.Combine(folder.Path, "map.png")).Should().BeTrue(because: "only .md files are cleaned, as only those are uploaded");
+        File.Exists(Path.Combine(folder.Path, ".obsidian", "workspace.md")).Should().BeTrue(because: "dot-folders are left alone");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithClean_WhenDeclined_ShouldNeitherDownloadNorDelete()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        folder.Write("stray.md", "Not in the store.");
+        confirmPrompt.Answer = false;
+
+        await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Clean: true));
+
+        confirmPrompt.Asked.Should().ContainSingle();
+        File.Exists(Path.Combine(folder.Path, "stray.md")).Should().BeTrue();
+        File.Exists(Path.Combine(folder.Path, "one.md")).Should().BeFalse(because: "declining cancels the whole download");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithClean_OverTheLimit_ShouldAbortWithoutAsking()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        for (var i = 0; i <= FileDownloader.MaxCleanDeletions; i++)
+        {
+            folder.Write($"stray{i}.md", "Not in the store.");
+        }
+        confirmPrompt.Answer = true;
+
+        await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Clean: true));
+
+        confirmPrompt.Asked.Should().BeEmpty();
+        Directory.GetFiles(folder.Path).Should().HaveCount(FileDownloader.MaxCleanDeletions + 1,
+            because: "nothing is deleted or downloaded");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithClean_WhenNothingIsStray_ShouldDownloadWithoutAsking()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        folder.Write("one.md", "Local content.");
+
+        await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true, Clean: true));
+
+        confirmPrompt.Asked.Should().BeEmpty();
+        File.ReadAllText(Path.Combine(folder.Path, "one.md")).Should().Be("Stored content.");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithClean_OfAParentCategory_ShouldKeepEveryLeafsFiles()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), "Local Kira.");
+        folder.Write(Path.Combine("Npcs", "Rivals", "vex.md"), "Not in the store.");
+        confirmPrompt.Answer = true;
+
+        await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Clean: true));
+
+        File.ReadAllText(Path.Combine(folder.Path, "Npcs", "Allies", "kira.md")).Should().Be("Local Kira.",
+            because: "a file skipped for lack of --overwrite is still part of the download");
+        File.Exists(Path.Combine(folder.Path, "Oracles", "moves.md")).Should().BeTrue();
+        Directory.Exists(Path.Combine(folder.Path, "Npcs", "Rivals")).Should().BeFalse();
+    }
+
+    private readonly RecordingConfirmPrompt confirmPrompt = new();
+
     private async Task Download(DownloadOptions options) =>
-        await new FileDownloader(Db).DownloadFile(options);
+        await new FileDownloader(Db, confirmPrompt).DownloadFile(options);
 
     private async Task<string> DownloadCapturingOutput(DownloadOptions options)
     {
@@ -283,5 +446,17 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         }
 
         return output.ToString();
+    }
+
+    private sealed class RecordingConfirmPrompt : IConfirmPrompt
+    {
+        public bool Answer { get; set; }
+        public List<string> Asked { get; } = [];
+
+        public bool Confirm(string question)
+        {
+            Asked.Add(question);
+            return Answer;
+        }
     }
 }

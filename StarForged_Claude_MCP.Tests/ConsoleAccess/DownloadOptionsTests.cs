@@ -33,7 +33,17 @@ public class DownloadOptionsTests
     }
 
     [Theory]
+    [InlineData("--clean")]
+    [InlineData("-c")]
+    public void Parse_CleanFlagWithFolder_ShouldSetClean(string flag)
+    {
+        DownloadOptions.Parse(["lore", @".\out", "--folder", flag])!.Clean.Should().BeTrue();
+    }
+
+    [Theory]
     [InlineData("lore", "--folder")]
+    [InlineData("lore", "ship.md", "--document", "ship.md", "--clean")]
+    [InlineData("log", "s3.md", "--beats", "3", "-c")]
     [InlineData("lore", @".\out")]
     [InlineData("lore", "s3.md", "--beats", "three")]
     [InlineData("lore", "ship.md", "--document")]

@@ -141,6 +141,56 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
+    public async Task UploadFolder_WhenNothingChanged_ShouldReportTheDocumentUnchanged()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith hammered the glowing iron."));
+        await Upload(folder, SummaryMode.None, indexed: true);
+
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith quenched the glowing iron."));
+        var output = await UploadCapturingOutput(folder, SummaryMode.None, indexed: true);
+
+        output.Should().Contain("Unchanged.");
+        output.Should().Contain("0 document(s) stored, 1 replaced, 1 unchanged.");
+        (await Search("coral reef tropical fish")).Should().Contain(result => result.Text.Contains("coral reef"),
+            because: "an unchanged document keeps its index");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WhenOnlyTheSummaryChanged_ShouldReplaceIt()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("notes.md", Markdown("Notes", "The notes."));
+        await Upload(folder, SummaryMode.None);
+
+        var output = await UploadCapturingOutput(folder, SummaryMode.All, answers: new() { ["notes.md"] = "A new summary" });
+
+        output.Should().Contain("Replaced: summary changed.");
+        output.Should().Contain("1 replaced, 0 unchanged.");
+        (await Db.GetDocument(Category, "notes.md"))!.Summary.Should().Be("A new summary");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WhenOnlyIndexingIsTurnedOn_ShouldIndexTheExistingContent()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        await Upload(folder, SummaryMode.None);
+
+        var output = await UploadCapturingOutput(folder, SummaryMode.None, indexed: true);
+
+        output.Should().Contain("Replaced: indexed.");
+        (await Search("coral reef tropical fish")).Should().NotBeEmpty();
+    }
+
+    [Fact]
     public async Task UploadDocument_ShouldStoreOnlyThatFileAndApplyTheSummaryMode()
     {
         await ClearTestDocuments();
@@ -279,6 +329,28 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await Run(
             new UploadOptions(Category, UploadMode.Folder, SourcePath: folder.Path, Indexed: indexed, Summaries: summaries),
             answers);
+
+    private async Task<string> UploadCapturingOutput(
+        TempFolder folder,
+        SummaryMode summaries,
+        bool indexed = false,
+        Dictionary<string, string>? answers = null)
+    {
+        var original = Console.Out;
+        using var output = new StringWriter();
+        Console.SetOut(output);
+
+        try
+        {
+            await Upload(folder, summaries, indexed, answers);
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
+        return output.ToString();
+    }
 
     private async Task<RecordingSummaryPrompt> Run(UploadOptions options, Dictionary<string, string>? answers = null)
     {

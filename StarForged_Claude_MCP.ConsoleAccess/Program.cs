@@ -82,6 +82,7 @@ public class Program
         services.AddSingleton<CategoryLister>();
         services.AddSingleton<BeatPreprocessor>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
+        services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
         services.AddEmbeddingsServices();
     }
 
@@ -117,7 +118,7 @@ public class Program
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index] [--summaries <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index] [--summaries <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --beats <sessionNumber> [--overwrite]");
         Console.WriteLine("  .\\ConsoleAccess.exe cat <category> <filename>");
