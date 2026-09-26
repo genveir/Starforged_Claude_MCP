@@ -42,14 +42,19 @@ public class FileUploader
             return;
         }
 
+        if (options.DryRun)
+        {
+            Console.WriteLine("Dry run: nothing will be stored, replaced or indexed, and nothing will be asked.");
+        }
+
         switch (options.Mode)
         {
             case UploadMode.Folder:
-                await UploadFolderAsync(options.Category, options.SourcePath!, options.Index, options.Summaries);
+                await UploadFolderAsync(options.Category, options.SourcePath!, options.Index, options.Summaries, options.DryRun);
                 break;
             case UploadMode.Document:
                 if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
-                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Index, options.Summaries);
+                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Index, options.Summaries, options.DryRun);
                 break;
             case UploadMode.Beats:
                 if (!await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)) return;
@@ -65,7 +70,7 @@ public class FileUploader
     /// becomes a subcategory, at any depth, so 'Oracles/moves.md' is stored in '{category}.Oracles'. The whole
     /// folder is checked before anything is written, so a folder that breaks the category hierarchy stores nothing.
     /// </summary>
-    private async Task UploadFolderAsync(string category, string folderPath, IndexMode index, SummaryMode summaries)
+    private async Task UploadFolderAsync(string category, string folderPath, IndexMode index, SummaryMode summaries, bool dryRun)
     {
         var leaves = new List<LeafUpload>();
         if (!TryPlanFolder(category, folderPath, leaves)) return;
@@ -83,19 +88,20 @@ public class FileUploader
 
         if (leaves is [var only] && only.Category == category)
         {
-            await UploadFilesAsync(category, only.Files, index, summaries);
+            await UploadFilesAsync(category, only.Files, index, summaries, dryRun);
             return;
         }
 
         var total = new UploadTally();
         foreach (var leaf in leaves)
         {
-            total += await UploadFilesAsync(leaf.Category, leaf.Files, index, summaries);
+            total += await UploadFilesAsync(leaf.Category, leaf.Files, index, summaries, dryRun);
         }
 
         Console.WriteLine(
-            $"\nUploaded to {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} under '{category}': " +
-            $"{total.Stored} stored, {total.Replaced} replaced, {total.Unchanged} unchanged.");
+            $"\n{(dryRun ? "Would upload" : "Uploaded")} to {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} " +
+            $"under '{category}': {total.Stored} stored, {total.Replaced} replaced, {total.Unchanged} unchanged.");
+        ReportSkippedQuestions(total.SkippedQuestions);
     }
 
     /// <summary>
@@ -142,13 +148,19 @@ public class FileUploader
         return true;
     }
 
-    private async Task<UploadTally> UploadFilesAsync(string category, string[] files, IndexMode index, SummaryMode summaries)
+    /// <summary>
+    /// Stores <paramref name="files"/> under <paramref name="category"/>. With <paramref name="dryRun"/> nothing is
+    /// written and nothing is asked: every question is taken as answered blank, and the report says what would change.
+    /// </summary>
+    private async Task<UploadTally> UploadFilesAsync(
+        string category, string[] files, IndexMode index, SummaryMode summaries, bool dryRun)
     {
         Console.WriteLine($"Found {files.Length} file(s) to process for '{category}'.");
 
         var stored = 0;
         var replaced = 0;
         var unchanged = 0;
+        var skippedQuestions = 0;
 
         foreach (var filePath in files)
         {
@@ -161,18 +173,31 @@ public class FileUploader
 
             // Asked for before anything is written, so that abandoning a run part way through
             // never leaves a document stored without the answers that were being typed for it.
-            var summary = ResolveSummary(filename, existing?.Summary, summaries);
-            var indexed = ResolveIndexed(filename, existing?.Indexed, index);
+            var skipped = new SkippedPrompts();
+            var summary = ResolveSummary(filename, existing?.Summary, summaries, dryRun ? skipped : summaryPrompt);
+            var indexed = ResolveIndexed(filename, existing?.Indexed, index, dryRun ? skipped : indexPrompt);
+
+            if (skipped.Questions.Count > 0)
+            {
+                Console.WriteLine($"  Would ask for {string.Join(" and ", skipped.Questions)}; taken as answered blank.");
+                skippedQuestions += skipped.Questions.Count;
+            }
 
             if (existing == null)
             {
-                await StoreDocumentAsync(category, filename, text, summary, indexed);
-                Console.WriteLine(indexed ? "  Stored and indexed." : "  Stored.");
+                if (!dryRun) await StoreDocumentAsync(category, filename, text, summary, indexed);
+                Console.WriteLine((dryRun, indexed) switch
+                {
+                    (true, true) => "  Would store and index.",
+                    (true, false) => "  Would store.",
+                    (false, true) => "  Stored and indexed.",
+                    (false, false) => "  Stored."
+                });
                 stored++;
             }
             else
             {
-                var changes = await ReplaceDocumentAsync(existing, text, summary, indexed);
+                var changes = await ReplaceDocumentAsync(existing, text, summary, indexed, dryRun);
                 if (changes.Count == 0)
                 {
                     Console.WriteLine("  Unchanged.");
@@ -180,15 +205,26 @@ public class FileUploader
                 }
                 else
                 {
-                    Console.WriteLine($"  Replaced: {string.Join(", ", changes)}.");
+                    Console.WriteLine($"  {(dryRun ? "Would replace" : "Replaced")}: {string.Join(", ", changes)}.");
                     replaced++;
                 }
             }
         }
 
-        Console.WriteLine(
-            $"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced, {unchanged} unchanged.");
-        return new UploadTally(stored, replaced, unchanged);
+        Console.WriteLine(dryRun
+            ? $"\nDry run of '{category}': {stored} document(s) would be stored, {replaced} replaced, {unchanged} unchanged."
+            : $"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced, {unchanged} unchanged.");
+        ReportSkippedQuestions(skippedQuestions);
+        return new UploadTally(stored, replaced, unchanged, skippedQuestions);
+    }
+
+    private static void ReportSkippedQuestions(int skippedQuestions)
+    {
+        if (skippedQuestions > 0)
+        {
+            Console.WriteLine(
+                $"{skippedQuestions} question(s) were not asked and taken as answered blank; a real run would ask them.");
+        }
     }
 
     private async Task RunBeatsAsync(string category, int sessionNumber, CancellationToken cancellationToken)
@@ -213,20 +249,20 @@ public class FileUploader
             cancellationToken);
     }
 
-    private string? ResolveSummary(string filename, string? existingSummary, SummaryMode summaries) => summaries switch
+    private static string? ResolveSummary(string filename, string? existingSummary, SummaryMode summaries, ISummaryPrompt prompt) => summaries switch
     {
-        SummaryMode.All => summaryPrompt.Ask(filename, existingSummary),
-        SummaryMode.Missing => existingSummary ?? summaryPrompt.Ask(filename, existingSummary: null),
+        SummaryMode.All => prompt.Ask(filename, existingSummary),
+        SummaryMode.Missing => existingSummary ?? prompt.Ask(filename, existingSummary: null),
         SummaryMode.None => existingSummary,
         SummaryMode.Drop => null,
         _ => throw new ArgumentException($"Unknown summary mode {summaries}", nameof(summaries))
     };
 
-    private bool ResolveIndexed(string filename, bool? currentlyIndexed, IndexMode index) => index switch
+    private static bool ResolveIndexed(string filename, bool? currentlyIndexed, IndexMode index, IIndexPrompt prompt) => index switch
     {
         IndexMode.All => true,
-        IndexMode.Ask => indexPrompt.Ask(filename, currentlyIndexed),
-        IndexMode.New => currentlyIndexed ?? indexPrompt.Ask(filename, currentlyIndexed: null),
+        IndexMode.Ask => prompt.Ask(filename, currentlyIndexed),
+        IndexMode.New => currentlyIndexed ?? prompt.Ask(filename, currentlyIndexed: null),
         IndexMode.Drop => false,
         _ => throw new ArgumentException($"Unknown index mode {index}", nameof(index))
     };
@@ -246,9 +282,11 @@ public class FileUploader
     /// <summary>
     /// Brings <paramref name="existing"/> in line with the given content, summary and index state, writing only
     /// what differs: the index is rebuilt only when the content changed or the document was not indexed before.
+    /// With <paramref name="dryRun"/> the changes are worked out but not made.
     /// </summary>
     /// <returns>A description of each change made; empty when the document already matched.</returns>
-    private async Task<List<string>> ReplaceDocumentAsync(Document existing, string content, string? summary, bool indexed)
+    private async Task<List<string>> ReplaceDocumentAsync(
+        Document existing, string content, string? summary, bool indexed, bool dryRun)
     {
         var changes = new List<string>();
         var contentChanged = existing.Content != content;
@@ -257,19 +295,19 @@ public class FileUploader
         if (contentChanged) changes.Add("content changed");
         if (summaryChanged) changes.Add("summary changed");
 
-        if (contentChanged || summaryChanged)
+        if ((contentChanged || summaryChanged) && !dryRun)
         {
             await dbInterface.UpdateDocument(existing.Id, content, summary);
         }
 
         if (indexed && (contentChanged || !existing.Indexed))
         {
-            await documentProcessingService.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+            if (!dryRun) await documentProcessingService.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
             changes.Add(existing.Indexed ? "reindexed" : "indexed");
         }
         else if (!indexed && existing.Indexed)
         {
-            await documentProcessingService.RemoveIndexForDocumentAsync(existing.Id);
+            if (!dryRun) await documentProcessingService.RemoveIndexForDocumentAsync(existing.Id);
             changes.Add("removed from index");
         }
 
@@ -390,9 +428,33 @@ public class FileUploader
 
     private sealed record LeafUpload(string Category, string[] Files);
 
-    private readonly record struct UploadTally(int Stored, int Replaced, int Unchanged)
+    private readonly record struct UploadTally(int Stored, int Replaced, int Unchanged, int SkippedQuestions)
     {
-        public static UploadTally operator +(UploadTally left, UploadTally right) =>
-            new(left.Stored + right.Stored, left.Replaced + right.Replaced, left.Unchanged + right.Unchanged);
+        public static UploadTally operator +(UploadTally left, UploadTally right) => new(
+            left.Stored + right.Stored,
+            left.Replaced + right.Replaced,
+            left.Unchanged + right.Unchanged,
+            left.SkippedQuestions + right.SkippedQuestions);
+    }
+
+    /// <summary>
+    /// Stands in for the prompts on a dry run: records each question instead of asking it, and gives the answer a
+    /// blank entry would, which keeps what is stored and leaves a new document without a summary and unindexed.
+    /// </summary>
+    private sealed class SkippedPrompts : ISummaryPrompt, IIndexPrompt
+    {
+        public List<string> Questions { get; } = [];
+
+        public string? Ask(string filename, string? existingSummary)
+        {
+            Questions.Add("a summary");
+            return existingSummary;
+        }
+
+        public bool Ask(string filename, bool? currentlyIndexed)
+        {
+            Questions.Add("whether to index");
+            return currentlyIndexed ?? false;
+        }
     }
 }

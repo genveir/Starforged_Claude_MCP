@@ -38,7 +38,8 @@ public record UploadOptions(
     string? SourcePath,
     int SessionNumber = 0,
     IndexMode Index = IndexMode.New,
-    SummaryMode Summaries = SummaryMode.Missing) : IConsoleAccessOptions
+    SummaryMode Summaries = SummaryMode.Missing,
+    bool DryRun = false) : IConsoleAccessOptions
 {
     public static UploadOptions? Parse(string[] args)
     {
@@ -55,6 +56,7 @@ public record UploadOptions(
         var indexGiven = false;
         var summaries = SummaryMode.Missing;
         var summariesGiven = false;
+        var dryRun = false;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -102,6 +104,10 @@ public record UploadOptions(
                     }
                     summariesGiven = true;
                     break;
+                case "--dry-run":
+                case "-n":
+                    dryRun = true;
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
@@ -129,7 +135,14 @@ public record UploadOptions(
             return null;
         }
 
-        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, index, summaries);
+        if (mode == UploadMode.Beats && dryRun)
+        {
+            Console.Error.WriteLine("Error: beats are stored as they are typed, so --dry-run cannot be used with --beats.");
+            PrintUsage();
+            return null;
+        }
+
+        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, index, summaries, dryRun);
     }
 
     public static void PrintUsage()
@@ -157,5 +170,8 @@ public record UploadOptions(
         Console.WriteLine("                            missing  Ask only where there is no summary yet");
         Console.WriteLine("                            none     Ask for nothing, leave stored summaries alone");
         Console.WriteLine("                            drop     Ask for nothing, clear every summary uploaded");
+        Console.WriteLine("  -n, --dry-run           Report what a folder or document upload would store, replace and");
+        Console.WriteLine("                          index without writing anything; nothing is asked, and every");
+        Console.WriteLine("                          question is taken as answered blank");
     }
 }

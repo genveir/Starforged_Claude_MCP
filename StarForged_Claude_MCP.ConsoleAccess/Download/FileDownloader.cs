@@ -19,16 +19,21 @@ public class FileDownloader
 
     public async Task DownloadFile(DownloadOptions options)
     {
+        if (options.DryRun)
+        {
+            Console.WriteLine("Dry run: no file will be written or deleted, and nothing will be asked.");
+        }
+
         switch (options.Mode)
         {
             case DownloadMode.Folder:
-                await DownloadFolderAsync(options.Category, options.TargetPath, options.Overwrite, options.Clean);
+                await DownloadFolderAsync(options.Category, options.TargetPath, options.Overwrite, options.Clean, options.DryRun);
                 break;
             case DownloadMode.Document:
-                await DownloadDocumentAsync(options.Category, options.Filename!, options.TargetPath, options.Overwrite);
+                await DownloadDocumentAsync(options.Category, options.Filename!, options.TargetPath, options.Overwrite, options.DryRun);
                 break;
             case DownloadMode.Beats:
-                await DownloadBeatsAsync(options.Category, options.SessionNumber, options.TargetPath, options.Overwrite);
+                await DownloadBeatsAsync(options.Category, options.SessionNumber, options.TargetPath, options.Overwrite, options.DryRun);
                 break;
             default:
                 throw new ArgumentException($"Invalid download mode {options.Mode}");
@@ -39,9 +44,10 @@ public class FileDownloader
     /// Downloads every document in <paramref name="category"/> into <paramref name="folderPath"/>. For a parent
     /// category every leaf gets its own folder, nested to mirror the category tree: leaf 'Campaign.Npcs.Allies'
     /// under 'Campaign' goes to 'Npcs/Allies'. With <paramref name="clean"/>, the .md files in the folder that are
-    /// not part of the download are deleted afterwards, once the user has confirmed the list of them.
+    /// not part of the download are deleted afterwards, once the user has confirmed the list of them. With
+    /// <paramref name="dryRun"/> nothing is written or deleted, and the list is shown without asking.
     /// </summary>
-    private async Task DownloadFolderAsync(string category, string folderPath, bool overwrite, bool clean)
+    private async Task DownloadFolderAsync(string category, string folderPath, bool overwrite, bool clean, bool dryRun)
     {
         var leaves = await PlanFolderAsync(category, folderPath);
         if (leaves.Count == 0)
@@ -51,28 +57,36 @@ public class FileDownloader
         }
 
         var toDelete = clean ? FindFilesOutsideDownload(folderPath, leaves) : [];
-        if (!ConfirmClean(folderPath, toDelete)) return;
+        if (!ConfirmClean(folderPath, toDelete, dryRun)) return;
 
         if (leaves is [var only] && only.Category == category)
         {
-            var tally = await DownloadLeafAsync(only, overwrite);
-            ReportSkipped(tally.Skipped);
+            var tally = await DownloadLeafAsync(only, overwrite, dryRun);
+            ReportSkipped(tally.Skipped, dryRun);
         }
         else
         {
             var total = new DownloadTally();
             foreach (var leaf in leaves)
             {
-                total += await DownloadLeafAsync(leaf, overwrite);
+                total += await DownloadLeafAsync(leaf, overwrite, dryRun);
             }
 
             Console.WriteLine(
-                $"Downloaded {total.Written} document(s) from {leaves.Count} categor{(leaves.Count == 1 ? "y" : "ies")} " +
-                $"under '{category}' to {folderPath}: {total.Created} new, {total.Overwritten} overwritten, {total.Unchanged} unchanged.");
-            ReportSkipped(total.Skipped);
+                $"{(dryRun ? "Would download" : "Downloaded")} {total.Written} document(s) from {leaves.Count} " +
+                $"categor{(leaves.Count == 1 ? "y" : "ies")} under '{category}' to {folderPath}: " +
+                $"{total.Created} new, {total.Overwritten} overwritten, {total.Unchanged} unchanged.");
+            ReportSkipped(total.Skipped, dryRun);
         }
 
-        DeleteFiles(folderPath, toDelete);
+        if (dryRun)
+        {
+            ReportDeletions(folderPath, toDelete, leaves);
+        }
+        else
+        {
+            DeleteFiles(folderPath, toDelete);
+        }
     }
 
     private async Task<List<LeafDownload>> PlanFolderAsync(string category, string folderPath)
@@ -106,10 +120,7 @@ public class FileDownloader
         var outside = new List<string>();
         if (!Directory.Exists(folderPath)) return outside;
 
-        // Case-insensitive, like the Windows file system, so a file differing only in case is kept rather than deleted.
-        var downloaded = leaves
-            .SelectMany(leaf => leaf.Index.Select(entry => Path.GetFullPath(leaf.PathFor(entry))))
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var downloaded = DownloadedPaths(leaves);
 
         Collect(folderPath);
         return outside;
@@ -132,8 +143,19 @@ public class FileDownloader
         }
     }
 
-    /// <returns>Whether the download may go ahead: nothing is to be deleted, or the user agreed to the deletions.</returns>
-    private bool ConfirmClean(string folderPath, List<string> toDelete)
+    /// <summary>
+    /// The full path of every file the download of <paramref name="leaves"/> writes to, compared case-insensitively
+    /// like the Windows file system, so a file differing only in case is kept rather than deleted.
+    /// </summary>
+    private static HashSet<string> DownloadedPaths(List<LeafDownload> leaves) => leaves
+        .SelectMany(leaf => leaf.Index.Select(entry => Path.GetFullPath(leaf.PathFor(entry))))
+        .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    /// <returns>
+    /// Whether the download may go ahead: nothing is to be deleted, the user agreed to the deletions, or this is a
+    /// dry run under the limit, which lists the deletions without asking.
+    /// </returns>
+    private bool ConfirmClean(string folderPath, List<string> toDelete, bool dryRun)
     {
         if (toDelete.Count == 0) return true;
 
@@ -145,11 +167,13 @@ public class FileDownloader
             return false;
         }
 
-        Console.WriteLine($"--clean will delete these {toDelete.Count} file(s) from '{folderPath}':");
+        Console.WriteLine($"--clean {(dryRun ? "would" : "will")} delete these {toDelete.Count} file(s) from '{folderPath}':");
         foreach (var file in toDelete)
         {
             Console.WriteLine($"  {Path.GetRelativePath(folderPath, file)}");
         }
+
+        if (dryRun) return true;
 
         if (confirmPrompt.Confirm($"Delete these {toDelete.Count} file(s) and download?")) return true;
 
@@ -170,15 +194,10 @@ public class FileDownloader
             File.Delete(file);
         }
 
-        var root = Path.TrimEndingDirectorySeparator(Path.GetFullPath(folderPath));
+        var root = RootOf(folderPath);
         var foldersRemoved = 0;
 
-        var folders = files
-            .Select(file => Path.GetDirectoryName(Path.GetFullPath(file))!)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderByDescending(folder => folder.Length);
-
-        foreach (var start in folders)
+        foreach (var start in FoldersHolding(files))
         {
             var folder = start;
             while (!string.Equals(folder, root, StringComparison.OrdinalIgnoreCase)
@@ -196,7 +215,51 @@ public class FileDownloader
             (foldersRemoved > 0 ? $", and {foldersRemoved} folder(s) left empty." : "."));
     }
 
-    private async Task<DownloadTally> DownloadLeafAsync(LeafDownload leaf, bool overwrite)
+    /// <summary>
+    /// Reports what <see cref="DeleteFiles"/> would delete, counting the folders it would leave empty once the
+    /// download of <paramref name="leaves"/> had been written, since a folder the download writes to is kept.
+    /// </summary>
+    private static void ReportDeletions(string folderPath, List<string> files, List<LeafDownload> leaves)
+    {
+        if (files.Count == 0) return;
+
+        var deleted = files.Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var written = DownloadedPaths(leaves);
+        var root = RootOf(folderPath);
+        var emptied = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var start in FoldersHolding(files))
+        {
+            var folder = start;
+            while (!string.Equals(folder, root, StringComparison.OrdinalIgnoreCase)
+                && !emptied.Contains(folder)
+                && WouldBeLeftEmpty(folder))
+            {
+                emptied.Add(folder);
+                folder = Path.GetDirectoryName(folder)!;
+            }
+        }
+
+        Console.WriteLine(
+            $"Would delete {files.Count} file(s) not in the download" +
+            (emptied.Count > 0 ? $", and {emptied.Count} folder(s) left empty." : "."));
+
+        bool WouldBeLeftEmpty(string folder) =>
+            !written.Any(path => path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            && Directory.EnumerateFiles(folder).All(file => deleted.Contains(Path.GetFullPath(file)))
+            && Directory.EnumerateDirectories(folder)
+                .All(subfolder => new DirectoryInfo(subfolder).LinkTarget == null && WouldBeLeftEmpty(subfolder));
+    }
+
+    private static string RootOf(string folderPath) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(folderPath));
+
+    /// <returns>The folders holding <paramref name="files"/>, deepest first.</returns>
+    private static IEnumerable<string> FoldersHolding(List<string> files) => files
+        .Select(file => Path.GetDirectoryName(Path.GetFullPath(file))!)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderByDescending(folder => folder.Length);
+
+    private async Task<DownloadTally> DownloadLeafAsync(LeafDownload leaf, bool overwrite, bool dryRun)
     {
         var tally = new DownloadTally();
 
@@ -210,13 +273,13 @@ public class FileDownloader
             var existing = await CompareWithExistingAsync(path, document.Content);
             if (existing == ExistingFile.Different && !overwrite)
             {
-                Console.Error.WriteLine($"Skipped (already exists and differs): {path}");
+                Console.Error.WriteLine($"{(dryRun ? "Would skip" : "Skipped")} (already exists and differs): {path}");
                 tally = tally with { Skipped = tally.Skipped + 1 };
                 continue;
             }
 
-            await WriteAsync(path, document.Content, existing);
-            Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(existing)}");
+            if (!dryRun) await WriteAsync(path, document.Content, existing);
+            Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(existing, dryRun)}");
             tally = existing switch
             {
                 ExistingFile.Missing => tally with { Created = tally.Created + 1 },
@@ -226,21 +289,22 @@ public class FileDownloader
         }
 
         Console.WriteLine(
-            $"Downloaded {tally.Written} document(s) from category '{leaf.Category}' to {leaf.Folder}: " +
+            $"{(dryRun ? "Would download" : "Downloaded")} {tally.Written} document(s) from category '{leaf.Category}' to {leaf.Folder}: " +
             $"{tally.Created} new, {tally.Overwritten} overwritten, {tally.Unchanged} unchanged.");
         return tally;
     }
 
-    private static void ReportSkipped(int skipped)
+    private static void ReportSkipped(int skipped, bool dryRun)
     {
         if (skipped > 0)
         {
             Console.WriteLine(
-                $"Skipped {skipped} existing file(s) that differ from the stored version; pass --overwrite to replace them.");
+                $"{(dryRun ? "Would skip" : "Skipped")} {skipped} existing file(s) that differ from the stored version; " +
+                "pass --overwrite to replace them.");
         }
     }
 
-    private async Task DownloadDocumentAsync(string category, string filename, string targetPath, bool overwrite)
+    private async Task DownloadDocumentAsync(string category, string filename, string targetPath, bool overwrite, bool dryRun)
     {
         var document = await dbInterface.GetDocument(category, filename);
 
@@ -255,13 +319,13 @@ public class FileDownloader
             : targetPath;
 
         var existing = await CompareWithExistingAsync(path, document.Content);
-        if (!CanWrite(path, existing, overwrite)) return;
+        if (!CanWrite(path, existing, overwrite, dryRun)) return;
 
-        await WriteAsync(path, document.Content, existing);
-        Console.WriteLine($"{filename} -> {path} {DescribeWrite(existing)}");
+        if (!dryRun) await WriteAsync(path, document.Content, existing);
+        Console.WriteLine($"{filename} -> {path} {DescribeWrite(existing, dryRun)}");
     }
 
-    private async Task DownloadBeatsAsync(string category, int sessionNumber, string path, bool overwrite)
+    private async Task DownloadBeatsAsync(string category, int sessionNumber, string path, bool overwrite, bool dryRun)
     {
         var beats = CanonicalBeats.Select(await dbInterface.GetBeatsForSession(category, sessionNumber));
 
@@ -275,20 +339,24 @@ public class FileDownloader
         var content = string.Join(separator, beats.Select(b => b.Content.TrimEnd())) + Environment.NewLine;
 
         var existing = await CompareWithExistingAsync(path, content);
-        if (!CanWrite(path, existing, overwrite)) return;
+        if (!CanWrite(path, existing, overwrite, dryRun)) return;
 
-        await WriteAsync(path, content, existing);
-        Console.WriteLine($"Downloaded {beats.Count} beat(s) of session {sessionNumber} to {path} {DescribeWrite(existing)}.");
+        if (!dryRun) await WriteAsync(path, content, existing);
+        Console.WriteLine(
+            $"{(dryRun ? "Would download" : "Downloaded")} {beats.Count} beat(s) of session {sessionNumber} to {path} " +
+            $"{DescribeWrite(existing, dryRun)}.");
     }
 
     /// <summary>
     /// An identical file never blocks a download, since leaving it in place is all an overwrite would do.
     /// </summary>
-    private static bool CanWrite(string path, ExistingFile existing, bool overwrite)
+    private static bool CanWrite(string path, ExistingFile existing, bool overwrite, bool dryRun)
     {
         if (existing != ExistingFile.Different || overwrite) return true;
 
-        Console.Error.WriteLine($"Error: '{path}' already exists and differs from the stored version; pass --overwrite to replace it.");
+        Console.Error.WriteLine(
+            $"{(dryRun ? "A real run would fail" : "Error")}: '{path}' already exists and differs from the stored version; " +
+            "pass --overwrite to replace it.");
         return false;
     }
 
@@ -312,10 +380,12 @@ public class FileDownloader
         await File.WriteAllTextAsync(path, content);
     }
 
-    private static string DescribeWrite(ExistingFile existing) => existing switch
+    private static string DescribeWrite(ExistingFile existing, bool dryRun) => (existing, dryRun) switch
     {
-        ExistingFile.Missing => "(new)",
-        ExistingFile.Different => "(overwritten)",
+        (ExistingFile.Missing, false) => "(new)",
+        (ExistingFile.Missing, true) => "(would be new)",
+        (ExistingFile.Different, false) => "(overwritten)",
+        (ExistingFile.Different, true) => "(would be overwritten)",
         _ => "(unchanged)"
     };
 

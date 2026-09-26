@@ -425,6 +425,103 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         Directory.Exists(Path.Combine(folder.Path, "Npcs", "Rivals")).Should().BeFalse();
     }
 
+    [Fact]
+    public async Task DownloadFolder_WithDryRun_ShouldReportWhatWouldBeWrittenAndDeletedWithoutTouchingAnything()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "new.md", "New content.", summary: null);
+        await Db.StoreDocument(Category, "changed.md", "Stored content.", summary: null);
+        await Db.StoreDocument(Category, "same.md", "Same content.", summary: null);
+        folder.Write("changed.md", "Local content.");
+        folder.Write("same.md", "Same content.");
+        folder.Write("stray.md", "Not in the store.");
+        folder.Write(Path.Combine("Old", "Deep", "gone.md"), "Not in the store.");
+        confirmPrompt.Answer = false;
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true, Clean: true, DryRun: true));
+
+        confirmPrompt.Asked.Should().BeEmpty(because: "a dry run lists the deletions without asking");
+        output.Should().Contain("--clean would delete these 2 file(s)");
+        output.Should().Contain($"{Path.Combine(folder.Path, "new.md")} (would be new)");
+        output.Should().Contain($"{Path.Combine(folder.Path, "changed.md")} (would be overwritten)");
+        output.Should().Contain("Would download 2 document(s)").And.Contain("1 new, 1 overwritten, 1 unchanged.");
+        output.Should().Contain("Would delete 2 file(s) not in the download, and 2 folder(s) left empty.");
+
+        File.Exists(Path.Combine(folder.Path, "new.md")).Should().BeFalse();
+        File.ReadAllText(Path.Combine(folder.Path, "changed.md")).Should().Be("Local content.");
+        File.Exists(Path.Combine(folder.Path, "stray.md")).Should().BeTrue();
+        File.Exists(Path.Combine(folder.Path, "Old", "Deep", "gone.md")).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithDryRun_ShouldNotCountAFolderTheDownloadWritesToAsLeftEmpty()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        folder.Write(Path.Combine("Npcs", "Allies", "old_kira.md"), "Not in the store.");
+        folder.Write(Path.Combine("Npcs", "Rivals", "vex.md"), "Not in the store.");
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Clean: true, DryRun: true));
+
+        output.Should().Contain("Would delete 2 file(s) not in the download, and 1 folder(s) left empty.",
+            because: "'Rivals' empties, while 'Allies' gets kira.md and so keeps 'Npcs' too");
+        File.Exists(Path.Combine(folder.Path, "Npcs", "Allies", "kira.md")).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithDryRun_ShouldReportSkippedFilesWithoutOverwrite()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        folder.Write("one.md", "Local content.");
+
+        var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, DryRun: true));
+
+        output.Should().Contain("Would skip 1 existing file(s)");
+        File.ReadAllText(Path.Combine(folder.Path, "one.md")).Should().Be("Local content.");
+    }
+
+    [Fact]
+    public async Task DownloadDocument_WithDryRun_ShouldReportWithoutWriting()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        var target = Path.Combine(folder.Path, "ship.md");
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md", DryRun: true));
+
+        output.Should().Contain($"{target} (would be new)");
+        File.Exists(target).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task DownloadBeats_WithDryRun_ShouldReportWithoutWriting()
+    {
+        await ClearTestBeats();
+        using var folder = new TempFolder();
+
+        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The arrival.");
+        folder.Write("session3.md", "Local content.");
+        var target = Path.Combine(folder.Path, "session3.md");
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true, DryRun: true));
+
+        output.Should().Contain($"Would download 1 beat(s) of session 3 to {target} (would be overwritten).");
+        File.ReadAllText(target).Should().Be("Local content.");
+    }
+
     private readonly RecordingConfirmPrompt confirmPrompt = new();
 
     private async Task Download(DownloadOptions options) =>

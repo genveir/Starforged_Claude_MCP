@@ -382,6 +382,55 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             [$"{Category}.Npcs.Allies"], because: "'Npcs' is already a parent category, so nothing is written");
     }
 
+    [Fact]
+    public async Task UploadFolder_WithDryRun_ShouldReportTheChangesWithoutWritingOrAsking()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "changed.md", "Older content.", summary: "A stored summary");
+        await Db.StoreDocument(Category, "same.md", Markdown("Same", "Stays as it is."), summary: "Kept");
+        folder.Write("changed.md", Markdown("Changed", "Replacement content."));
+        folder.Write("same.md", Markdown("Same", "Stays as it is."));
+        folder.Write("brand_new.md", Markdown("New", "Never stored before."));
+
+        Prompts prompts = null!;
+        var output = await CapturingOutput(async () => prompts = await Run(new UploadOptions(
+            Category, UploadMode.Folder, SourcePath: folder.Path, Index: IndexMode.New, Summaries: SummaryMode.Missing, DryRun: true)));
+
+        prompts.Summary.Asked.Should().BeEmpty(because: "a dry run asks nothing");
+        prompts.Index.Asked.Should().BeEmpty();
+
+        output.Should().Contain("Would ask for a summary and whether to index; taken as answered blank.");
+        output.Should().Contain("Would replace: content changed.");
+        output.Should().Contain("1 document(s) would be stored, 1 replaced, 1 unchanged.");
+        output.Should().Contain("2 question(s) were not asked",
+            because: "only the new file lacks a summary and has never been asked about indexing");
+
+        (await Db.GetDocumentIndex(Category)).Select(d => d.Filename).Should().BeEquivalentTo(["changed.md", "same.md"]);
+        (await Db.GetDocument(Category, "changed.md"))!.Content.Should().Be("Older content.");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WithDryRun_ShouldLeaveTheIndexAlone()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        await Upload(folder, SummaryMode.None, index: IndexMode.All);
+
+        folder.Write("reef.md", Markdown("Forge", "The blacksmith hammered the glowing iron on the anvil."));
+        var output = await CapturingOutput(() => Run(new UploadOptions(
+            Category, UploadMode.Folder, SourcePath: folder.Path, Index: IndexMode.Drop, Summaries: SummaryMode.None, DryRun: true)));
+
+        output.Should().Contain("Would replace: content changed, removed from index.");
+
+        var results = await Search("coral reef tropical fish");
+        results.Should().ContainSingle().Which.Text.Should().Contain("coral reef",
+            because: "the dry run neither replaced the content nor removed it from the index");
+    }
+
     private static string Markdown(string header, string body) =>
         $"# {header}{Environment.NewLine}{Environment.NewLine}{body}";
 
@@ -400,7 +449,10 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         TempFolder folder,
         SummaryMode summaries,
         IndexMode index = IndexMode.Drop,
-        Dictionary<string, string>? answers = null)
+        Dictionary<string, string>? answers = null) =>
+        await CapturingOutput(() => Upload(folder, summaries, index, answers));
+
+    private static async Task<string> CapturingOutput(Func<Task> run)
     {
         var original = Console.Out;
         using var output = new StringWriter();
@@ -408,7 +460,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         try
         {
-            await Upload(folder, summaries, index, answers);
+            await run();
         }
         finally
         {

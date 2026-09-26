@@ -41,6 +41,15 @@ public class DownloadOptionsTests
     }
 
     [Theory]
+    [InlineData("lore", @".\out", "--folder", "--dry-run")]
+    [InlineData("lore", "ship.md", "--document", "ship.md", "-n")]
+    [InlineData("log", "s3.md", "--beats", "3", "--dry-run")]
+    public void Parse_DryRunFlag_ShouldSetDryRunInEveryMode(params string[] args)
+    {
+        DownloadOptions.Parse(args)!.DryRun.Should().BeTrue();
+    }
+
+    [Theory]
     [InlineData("lore", "--folder")]
     [InlineData("lore", "ship.md", "--document", "ship.md", "--clean")]
     [InlineData("log", "s3.md", "--beats", "3", "-c")]

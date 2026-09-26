@@ -9,7 +9,8 @@ public record DownloadOptions(
     string? Filename = null,
     int SessionNumber = 0,
     bool Overwrite = false,
-    bool Clean = false) : IConsoleAccessOptions
+    bool Clean = false,
+    bool DryRun = false) : IConsoleAccessOptions
 {
     public static DownloadOptions? Parse(string[] args)
     {
@@ -34,6 +35,7 @@ public record DownloadOptions(
         int sessionNumber = 0;
         bool overwrite = false;
         bool clean = false;
+        bool dryRun = false;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -67,6 +69,10 @@ public record DownloadOptions(
                 case "-c":
                     clean = true;
                     break;
+                case "--dry-run":
+                case "-n":
+                    dryRun = true;
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
@@ -87,7 +93,7 @@ public record DownloadOptions(
             return null;
         }
 
-        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean);
+        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean, dryRun);
     }
 
     public static void PrintUsage()
@@ -106,5 +112,7 @@ public record DownloadOptions(
         Console.WriteLine("  -c, --clean             With --folder: delete the .md files in <path> that are not part of the");
         Console.WriteLine("                          download, after listing them and asking; folders starting with a");
         Console.WriteLine("                          period are left alone");
+        Console.WriteLine("  -n, --dry-run           Report what would be written, overwritten, skipped and deleted");
+        Console.WriteLine("                          without touching any file; --clean lists its files without asking");
     }
 }

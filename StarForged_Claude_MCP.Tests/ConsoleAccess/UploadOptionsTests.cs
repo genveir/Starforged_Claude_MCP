@@ -23,11 +23,20 @@ public class UploadOptionsTests
     }
 
     [Theory]
+    [InlineData("--dry-run")]
+    [InlineData("-n")]
+    public void Parse_DryRunFlag_ShouldSetDryRun(string flag)
+    {
+        UploadOptions.Parse(["lore", "--folder", @".\in", flag])!.DryRun.Should().BeTrue();
+    }
+
+    [Theory]
     [InlineData("lore", "--folder", @".\in", "--index")]
     [InlineData("lore", "--folder", @".\in", "--index", "--summaries", "none")]
     [InlineData("lore", "--folder", @".\in", "--index", "sometimes")]
     [InlineData("log", "--beats", "3", "--index", "all")]
     [InlineData("log", "--beats", "3", "--summaries", "none")]
+    [InlineData("log", "--beats", "3", "--dry-run")]
     public void Parse_WithMissingOrInvalidArguments_ShouldReturnNull(params string[] args)
     {
         UploadOptions.Parse(args).Should().BeNull();

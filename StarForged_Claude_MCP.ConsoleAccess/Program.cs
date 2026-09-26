@@ -116,12 +116,12 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>]");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>] [--dry-run]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>] [--dry-run]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean]");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite]");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --beats <sessionNumber> [--overwrite]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean] [--dry-run]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite] [--dry-run]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --beats <sessionNumber> [--overwrite] [--dry-run]");
         Console.WriteLine("  .\\ConsoleAccess.exe cat <category> <filename>");
         Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
         Console.WriteLine("  .\\ConsoleAccess.exe list");
