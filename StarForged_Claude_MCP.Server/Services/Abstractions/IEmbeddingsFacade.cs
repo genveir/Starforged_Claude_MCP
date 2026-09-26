@@ -1,7 +1,7 @@
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 
-namespace StarForged_Claude_MCP.Server.Services;
+namespace StarForged_Claude_MCP.Server.Services.Abstractions;
 
 public interface IEmbeddingsFacade
 {

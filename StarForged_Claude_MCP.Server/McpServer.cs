@@ -1,10 +1,11 @@
 ﻿using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Server.Models;
+using StarForged_Claude_MCP.Server.Services.Abstractions;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 
-namespace StarForged_Claude_MCP.Server.Services;
+namespace StarForged_Claude_MCP.Server;
 
 public class McpServer
 {

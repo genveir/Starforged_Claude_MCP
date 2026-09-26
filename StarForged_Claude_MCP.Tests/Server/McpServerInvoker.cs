@@ -1,5 +1,5 @@
+using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
-using StarForged_Claude_MCP.Server.Services;
 using System.Reflection;
 
 namespace StarForged_Claude_MCP.Tests.Server;

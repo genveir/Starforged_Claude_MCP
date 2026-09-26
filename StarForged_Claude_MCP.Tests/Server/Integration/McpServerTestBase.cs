@@ -1,7 +1,8 @@
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
-using StarForged_Claude_MCP.Server.Services;
+using StarForged_Claude_MCP.Server.Services.Abstractions;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;

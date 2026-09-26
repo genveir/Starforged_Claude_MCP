@@ -1,3 +1,5 @@
+using StarForged_Claude_MCP.Server.Services.Abstractions;
+
 namespace StarForged_Claude_MCP.Server.Services;
 
 public class WritePermissions : IWritePermissions

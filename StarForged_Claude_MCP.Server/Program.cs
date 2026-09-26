@@ -6,6 +6,7 @@ using Serilog;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Server.Services;
+using StarForged_Claude_MCP.Server.Services.Abstractions;
 
 namespace StarForged_Claude_MCP.Server;
 

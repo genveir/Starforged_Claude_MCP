@@ -3,7 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
-using StarForged_Claude_MCP.Server.Services;
+using StarForged_Claude_MCP.Server.Services.Abstractions;
 using StarForged_Claude_MCP.Tests.Server.Integration;
 
 namespace StarForged_Claude_MCP.Tests.ConsoleAccess;

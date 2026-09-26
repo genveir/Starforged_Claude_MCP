@@ -3,8 +3,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
+using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
+using StarForged_Claude_MCP.Server.Services.Abstractions;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
 
