@@ -7,6 +7,7 @@ using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Server.Tools;
 
 namespace StarForged_Claude_MCP.Server;
 
@@ -54,6 +55,7 @@ public class Program
             firstChallengeDie: new Die(sides: 10),
             secondChallengeDie: new Die(sides: 10)));
         builder.Services.AddSingleton<IWritePermissions, WritePermissions>();
+        builder.Services.AddMcpTools();
         builder.Services.AddSingleton<McpServer>();
 
         var host = builder.Build();

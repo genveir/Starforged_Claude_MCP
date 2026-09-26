@@ -1,6 +1,5 @@
 ﻿using System.Text.Json;
 using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
@@ -50,12 +49,11 @@ public class RollDiceToolTests
             firstChallengeDie: new FakeDie(firstChallengeDie),
             secondChallengeDie: new FakeDie(secondChallengeDie));
 
-        var server = new McpServer(
+        var server = McpServerFactory.Create(
             new Mock<IEmbeddingsFacade>(MockBehavior.Strict).Object,
             new Mock<IDocumentsFacade>(MockBehavior.Strict).Object,
             roller,
-            new WritePermissions(),
-            NullLogger<McpServer>.Instance);
+            new WritePermissions());
 
         var response = await McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
         {

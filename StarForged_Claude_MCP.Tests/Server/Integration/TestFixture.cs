@@ -7,6 +7,7 @@ using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Server.Tools;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
@@ -50,6 +51,7 @@ public class TestFixture : IAsyncLifetime
             firstChallengeDie: new Die(sides: 10),
             secondChallengeDie: new Die(sides: 10)));
         services.AddSingleton<IWritePermissions, WritePermissions>();
+        services.AddMcpTools();
         services.AddSingleton<McpServer>();
 
         services.AddSingleton<IConfiguration>(configuration);

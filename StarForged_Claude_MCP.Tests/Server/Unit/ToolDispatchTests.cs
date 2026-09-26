@@ -7,6 +7,7 @@ using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Server.Tools.Abstractions;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
 
@@ -230,7 +231,7 @@ public class ToolDispatchTests
         var embeddings = CreateEmbeddingsMock();
         var documents = CreateDocumentsMock();
         var permissions = CreateWritePermissionsMock();
-        var server = new McpServer(embeddings.Object, documents.Object, CreateDiceRoller(), permissions.Object, NullLogger<McpServer>.Instance);
+        var server = McpServerFactory.Create(embeddings.Object, documents.Object, CreateDiceRoller(), permissions.Object);
 
         var response = await McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
         {
@@ -250,14 +251,28 @@ public class ToolDispatchTests
         toolCase.VerifyDispatch(embeddings, documents, permissions);
     }
 
+    [Fact]
+    public void Server_WhenTwoToolsShareAName_ShouldRefuseToStart()
+    {
+        var first = new Mock<ITool>();
+        first.Setup(t => t.Definition).Returns(new Tool { Name = "search_index" });
+        var second = new Mock<ITool>();
+        second.Setup(t => t.Definition).Returns(new Tool { Name = "search_index" });
+
+        var construct = () => new McpServer([first.Object, second.Object], NullLogger<McpServer>.Instance);
+
+        construct.Should().Throw<InvalidOperationException>()
+            .WithMessage("*'search_index'*",
+                because: "a second tool under one name would be advertised twice and only one of them could ever be called");
+    }
+
     private static List<string> ListAdvertisedToolNames()
     {
-        var server = new McpServer(
+        var server = McpServerFactory.Create(
             CreateEmbeddingsMock().Object,
             CreateDocumentsMock().Object,
             CreateDiceRoller(),
-            CreateWritePermissionsMock().Object,
-            NullLogger<McpServer>.Instance);
+            CreateWritePermissionsMock().Object);
 
         var response = McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
         {

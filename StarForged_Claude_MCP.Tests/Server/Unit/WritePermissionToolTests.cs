@@ -1,5 +1,4 @@
 ﻿using FluentAssertions;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Server;
@@ -234,14 +233,14 @@ public class WritePermissionToolTests
     }
 
     private static McpServer CreateServer(Mock<IDocumentsFacade> documents, IWritePermissions writePermissions) =>
-        new(new Mock<IEmbeddingsFacade>(MockBehavior.Strict).Object,
+        McpServerFactory.Create(
+            new Mock<IEmbeddingsFacade>(MockBehavior.Strict).Object,
             documents.Object,
             new DiceRoller(
                 actionDie: new Die(sides: 6),
                 firstChallengeDie: new Die(sides: 10),
                 secondChallengeDie: new Die(sides: 10)),
-            writePermissions,
-            NullLogger<McpServer>.Instance);
+            writePermissions);
 
     private static Mock<IDocumentsFacade> CreateDocumentsMock()
     {
