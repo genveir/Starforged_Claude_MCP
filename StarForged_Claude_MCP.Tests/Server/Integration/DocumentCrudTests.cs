@@ -181,7 +181,7 @@ public class DocumentCrudTests : McpServerTestBase
     }
 
     [Fact]
-    public async Task DocumentIndex_ShouldListTheCategorysDocumentsWithoutContent()
+    public async Task ListDocuments_ShouldListTheCategorysDocumentsWithoutContent()
     {
         await ClearTestDocuments();
 
@@ -208,7 +208,7 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = false
         });
 
-        var response = await CallTool("19", "document_index", new Dictionary<string, object>
+        var response = await CallTool("19", "list_documents", new Dictionary<string, object>
         {
             ["category"] = Category
         });

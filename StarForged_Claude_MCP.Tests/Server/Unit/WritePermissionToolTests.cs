@@ -225,7 +225,7 @@ public class WritePermissionToolTests
         var documents = CreateDocumentsMock();
         var server = CreateServer(documents, new WritePermissions());
 
-        var response = await CallToolAsync(server, "document_index", new Dictionary<string, object> { ["category"] = Category });
+        var response = await CallToolAsync(server, "list_documents", new Dictionary<string, object> { ["category"] = Category });
 
         response.ShouldHaveSucceeded();
         documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once);

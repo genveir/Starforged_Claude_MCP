@@ -89,7 +89,7 @@ public class CategoryHierarchyTests : McpServerTestBase
     }
 
     [Theory]
-    [InlineData("document_index")]
+    [InlineData("list_documents")]
     [InlineData("get_document")]
     [InlineData("get_document_summary")]
     [InlineData("get_canonical_beats")]
@@ -111,13 +111,13 @@ public class CategoryHierarchyTests : McpServerTestBase
     }
 
     [Fact]
-    public async Task DocumentIndex_OnALeafCategory_ShouldListOnlyItsOwnDocuments()
+    public async Task ListDocuments_OnALeafCategory_ShouldListOnlyItsOwnDocuments()
     {
         await ClearTestDocuments();
         await AddDocument(Oracles, "moons.md", "# Moons");
         await AddDocument(Sessions, "session_1.md", "# Session 1");
 
-        var response = await CallTool("4", "document_index", new Dictionary<string, object> { ["category"] = Oracles });
+        var response = await CallTool("4", "list_documents", new Dictionary<string, object> { ["category"] = Oracles });
 
         response.ShouldHaveSucceeded();
         ToolPayload(response).GetProperty("documents").EnumerateArray()

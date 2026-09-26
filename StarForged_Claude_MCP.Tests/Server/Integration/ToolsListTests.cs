@@ -42,7 +42,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "archive_document",
             "get_document",
             "get_document_summary",
-            "document_index",
+            "list_documents",
             "get_canonical_beats",
             "roll_dice",
             "request_write_permission",

@@ -178,7 +178,7 @@ public class McpServer
                         category = new { type = "string", description = LeafCategoryDescription + " Categories act as separate namespaces; a new one is created by storing its first document." },
                         filename = new { type = "string", description = "Filename, unique within the category (e.g., 'session_5.md')" },
                         text = new { type = "string", description = "The full content of the document. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
-                        summary = new { type = "string", description = "Optional short summary, surfaced in document_index" },
+                        summary = new { type = "string", description = "Optional short summary, shown alongside the filename whenever the category's documents are listed" },
                         indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it. Use index_document or deindex_document to change this later." }
                     },
                     required = new[] { "category", "filename", "text", "indexed" }
@@ -196,7 +196,7 @@ public class McpServer
                         category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to replace" },
                         text = new { type = "string", description = "The full replacement content; this is not a patch. Write well-formed Markdown: open with a '#' header and divide the rest under '##' headers. Sections are what the document is chunked on, their titles are what search results are labelled with, and they are what the section tools address. Content placed before the first header is stored, but search results for it carry no section label and no section tool can reach it." },
-                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
                     required = new[] { "category", "filename", "text" }
                 }
@@ -214,7 +214,7 @@ public class McpServer
                         filename = new { type = "string", description = "Filename of the document to edit" },
                         section = new { type = "string", description = "The section to replace, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
                         text = new { type = "string", description = "The replacement text for that section. Start it with the section's own header line, at the level that header is at now; renaming the section means writing a different title on that line. Everything the old section held is gone, its subsections included, so write out any of them that should survive. Headers further down must be deeper than the section's own, since a shallower one would end it." },
-                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
                     required = new[] { "category", "filename", "section", "text" }
                 }
@@ -233,7 +233,7 @@ public class McpServer
                         section = new { type = "string", description = "The section to edit, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
                         oldText = new { type = "string", description = "The exact text to find within that section, matched literally and case-sensitively. Every occurrence in the section is replaced. Refused if it does not appear in the section at all." },
                         newText = new { type = "string", description = "The text to put in place of every occurrence of oldText. An empty string deletes oldText outright." },
-                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
                     required = new[] { "category", "filename", "section", "oldText", "newText" }
                 }
@@ -251,7 +251,7 @@ public class McpServer
                         filename = new { type = "string", description = "Filename of the document to append to" },
                         section = new { type = "string", description = "Optional. The section to append to, named by its header text without the '#' markers and matched ignoring case; qualify an ambiguous name with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. The text lands at the very end of that section, after the last subsection nested under it, rather than directly after its own paragraphs. Leave it out to append at the end of the document." },
                         text = new { type = "string", description = "The text to add. When appending to a section, any header in it has to be deeper than that section's own header, since one at the same level or shallower would start a new section outside it instead." },
-                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
                     required = new[] { "category", "filename", "text" }
                 }
@@ -268,7 +268,7 @@ public class McpServer
                         category = new { type = "string", description = LeafCategoryDescription },
                         filename = new { type = "string", description = "Filename of the document to edit" },
                         section = new { type = "string", description = "The section to delete, named by its header text without the '#' markers and matched ignoring case, e.g. 'Burial Rites'. Where one name is ambiguous, qualify it with headers it sits under, separated by '>', e.g. 'Ironlander Customs > Burial Rites'. If nothing matches, or more than one section does, the error lists the document's sections." },
-                        summary = new { type = "string", description = "Optional. Replaces the document's summary, surfaced in document_index. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
+                        summary = new { type = "string", description = "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it." }
                     },
                     required = new[] { "category", "filename", "section" }
                 }
@@ -310,7 +310,7 @@ public class McpServer
                 // will readily archive it, so the honest name got the call refused for data its owner means
                 // to remove. Deleting stays behind the write permission and the client's own approval prompt.
                 Name = "archive_document",
-                Description = "Archives a document: it is hidden from indexing, so it no longer appears in search_index results or document_index. Requires that request_write_permission has been called for the category.",
+                Description = "Archives a document: it is hidden from indexing, so it no longer appears in search_index results or list_documents. Requires that request_write_permission has been called for the category.",
                 InputSchema = new
                 {
                     type = "object",
@@ -325,7 +325,7 @@ public class McpServer
             new()
             {
                 Name = "get_document",
-                Description = "Retrieves one document in full by category and filename, as listed by document_index.",
+                Description = "Retrieves one document in full by category and filename, as listed by list_documents.",
                 InputSchema = new
                 {
                     type = "object",
@@ -347,15 +347,15 @@ public class McpServer
                     properties = new
                     {
                         category = new { type = "string", description = LeafCategoryDescription },
-                        filename = new { type = "string", description = "Filename of the document, as returned by search_index or document_index" }
+                        filename = new { type = "string", description = "Filename of the document, as search results and document listings give it" }
                     },
                     required = new[] { "category", "filename" }
                 }
             },
             new()
             {
-                Name = "document_index",
-                Description = "Lists the documents in a leaf category with their summaries, without their content. Use get_document to fetch one in full. Given a parent category, it is refused with a list of the leaf categories under it.",
+                Name = "list_documents",
+                Description = "List documents: lists the documents in a leaf category, giving each one's filename, summary and whether it is indexed, without their content. Use it to browse a category, see which documents exist, or find a filename. Use get_document to fetch one in full. Given a parent category, it is refused with a list of the leaf categories under it.",
                 InputSchema = new
                 {
                     type = "object",
@@ -517,7 +517,7 @@ public class McpServer
             "archive_document" => await ExecuteArchiveDocumentAsync(arguments),
             "get_document" => await ExecuteGetDocumentAsync(arguments),
             "get_document_summary" => await ExecuteGetDocumentSummaryAsync(arguments),
-            "document_index" => await ExecuteDocumentIndexAsync(arguments),
+            "list_documents" => await ExecuteListDocumentsAsync(arguments),
             "get_canonical_beats" => await ExecuteGetCanonicalBeatsAsync(arguments),
             "roll_dice" => ExecuteRollDice(arguments),
             "request_write_permission" => await ExecuteRequestWritePermissionAsync(arguments),
@@ -789,14 +789,14 @@ public class McpServer
         }, _jsonOptions);
     }
 
-    private async Task<string> ExecuteDocumentIndexAsync(Dictionary<string, object> arguments)
+    private async Task<string> ExecuteListDocumentsAsync(Dictionary<string, object> arguments)
     {
         var category = RequireCategory(arguments);
         await RequireLeafCategoryAsync(category);
 
-        _logger.LogDebug("Executing document_index: category={Category}", category);
+        _logger.LogDebug("Executing list_documents: category={Category}", category);
         var documents = await _documents.GetDocumentIndexAsync(category);
-        _logger.LogDebug("document_index returned {Count} document(s)", documents.Count);
+        _logger.LogDebug("list_documents returned {Count} document(s)", documents.Count);
         return JsonSerializer.Serialize(new { documents }, _jsonOptions);
     }
 

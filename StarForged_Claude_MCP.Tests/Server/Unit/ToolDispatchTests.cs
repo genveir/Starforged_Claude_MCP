@@ -165,7 +165,7 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentSummaryAsync(Category, Filename), Times.Once)),
 
-        ["document_index"] = new ToolCase(
+        ["list_documents"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
             VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once)),
