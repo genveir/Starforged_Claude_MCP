@@ -12,17 +12,20 @@ public class FileUploader
     private readonly DbInterface dbInterface;
     private readonly BeatPreprocessor beatPreprocessor;
     private readonly ISummaryPrompt summaryPrompt;
+    private readonly IIndexPrompt indexPrompt;
 
     public FileUploader(
         IDocumentProcessingService documentProcessingService,
         DbInterface dbInterface,
         BeatPreprocessor beatPreprocessor,
-        ISummaryPrompt summaryPrompt)
+        ISummaryPrompt summaryPrompt,
+        IIndexPrompt indexPrompt)
     {
         this.documentProcessingService = documentProcessingService;
         this.dbInterface = dbInterface;
         this.beatPreprocessor = beatPreprocessor;
         this.summaryPrompt = summaryPrompt;
+        this.indexPrompt = indexPrompt;
     }
 
     public async Task UploadFile(UploadOptions options, CancellationToken cancellationToken)
@@ -42,11 +45,11 @@ public class FileUploader
         switch (options.Mode)
         {
             case UploadMode.Folder:
-                await UploadFolderAsync(options.Category, options.SourcePath!, options.Indexed, options.Summaries);
+                await UploadFolderAsync(options.Category, options.SourcePath!, options.Index, options.Summaries);
                 break;
             case UploadMode.Document:
                 if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
-                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Indexed, options.Summaries);
+                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Index, options.Summaries);
                 break;
             case UploadMode.Beats:
                 if (!await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)) return;
@@ -62,7 +65,7 @@ public class FileUploader
     /// becomes a subcategory, at any depth, so 'Oracles/moves.md' is stored in '{category}.Oracles'. The whole
     /// folder is checked before anything is written, so a folder that breaks the category hierarchy stores nothing.
     /// </summary>
-    private async Task UploadFolderAsync(string category, string folderPath, bool indexed, SummaryMode summaries)
+    private async Task UploadFolderAsync(string category, string folderPath, IndexMode index, SummaryMode summaries)
     {
         var leaves = new List<LeafUpload>();
         if (!TryPlanFolder(category, folderPath, leaves)) return;
@@ -80,14 +83,14 @@ public class FileUploader
 
         if (leaves is [var only] && only.Category == category)
         {
-            await UploadFilesAsync(category, only.Files, indexed, summaries);
+            await UploadFilesAsync(category, only.Files, index, summaries);
             return;
         }
 
         var total = new UploadTally();
         foreach (var leaf in leaves)
         {
-            total += await UploadFilesAsync(leaf.Category, leaf.Files, indexed, summaries);
+            total += await UploadFilesAsync(leaf.Category, leaf.Files, index, summaries);
         }
 
         Console.WriteLine(
@@ -139,7 +142,7 @@ public class FileUploader
         return true;
     }
 
-    private async Task<UploadTally> UploadFilesAsync(string category, string[] files, bool indexed, SummaryMode summaries)
+    private async Task<UploadTally> UploadFilesAsync(string category, string[] files, IndexMode index, SummaryMode summaries)
     {
         Console.WriteLine($"Found {files.Length} file(s) to process for '{category}'.");
 
@@ -157,8 +160,9 @@ public class FileUploader
             var existing = await dbInterface.GetDocument(category, filename);
 
             // Asked for before anything is written, so that abandoning a run part way through
-            // never leaves a document stored without the summary that was being typed for it.
+            // never leaves a document stored without the answers that were being typed for it.
             var summary = ResolveSummary(filename, existing?.Summary, summaries);
+            var indexed = ResolveIndexed(filename, existing?.Indexed, index);
 
             if (existing == null)
             {
@@ -216,6 +220,15 @@ public class FileUploader
         SummaryMode.None => existingSummary,
         SummaryMode.Drop => null,
         _ => throw new ArgumentException($"Unknown summary mode {summaries}", nameof(summaries))
+    };
+
+    private bool ResolveIndexed(string filename, bool? currentlyIndexed, IndexMode index) => index switch
+    {
+        IndexMode.All => true,
+        IndexMode.Ask => indexPrompt.Ask(filename, currentlyIndexed),
+        IndexMode.New => currentlyIndexed ?? indexPrompt.Ask(filename, currentlyIndexed: null),
+        IndexMode.Drop => false,
+        _ => throw new ArgumentException($"Unknown index mode {index}", nameof(index))
     };
 
     private async Task<int> StoreDocumentAsync(string category, string filename, string content, string? summary, bool indexed)

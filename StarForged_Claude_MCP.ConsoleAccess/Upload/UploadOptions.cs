@@ -17,12 +17,27 @@ public enum SummaryMode
     Drop
 }
 
+public enum IndexMode
+{
+    /// <summary>Ask for nothing and index everything uploaded.</summary>
+    All,
+
+    /// <summary>Ask for every file, offering to keep whether a stored file is indexed.</summary>
+    Ask,
+
+    /// <summary>Ask only for new files and leave stored files indexed or not as they are.</summary>
+    New,
+
+    /// <summary>Ask for nothing and remove everything uploaded from the index.</summary>
+    Drop
+}
+
 public record UploadOptions(
     string Category,
     UploadMode Mode,
     string? SourcePath,
     int SessionNumber = 0,
-    bool Indexed = false,
+    IndexMode Index = IndexMode.New,
     SummaryMode Summaries = SummaryMode.Missing) : IConsoleAccessOptions
 {
     public static UploadOptions? Parse(string[] args)
@@ -36,7 +51,8 @@ public record UploadOptions(
         UploadMode? mode = null;
         string? sourcePath = null;
         int sessionNumber = 0;
-        bool indexed = false;
+        var index = IndexMode.New;
+        var indexGiven = false;
         var summaries = SummaryMode.Missing;
         var summariesGiven = false;
 
@@ -68,7 +84,13 @@ public record UploadOptions(
                     break;
                 case "--index":
                 case "-i":
-                    indexed = true;
+                    if (i + 1 >= rest.Length || !Enum.TryParse(rest[++i], ignoreCase: true, out index))
+                    {
+                        Console.Error.WriteLine("Error: --index takes one of: all, ask, new, drop.");
+                        PrintUsage();
+                        return null;
+                    }
+                    indexGiven = true;
                     break;
                 case "--summaries":
                 case "-s":
@@ -93,7 +115,7 @@ public record UploadOptions(
             return null;
         }
 
-        if (mode == UploadMode.Beats && indexed)
+        if (mode == UploadMode.Beats && indexGiven)
         {
             Console.Error.WriteLine("Error: beats are never searchable, so --index cannot be used with --beats.");
             PrintUsage();
@@ -107,7 +129,7 @@ public record UploadOptions(
             return null;
         }
 
-        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, indexed, summaries);
+        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, index, summaries);
     }
 
     public static void PrintUsage()
@@ -122,7 +144,13 @@ public record UploadOptions(
         Console.WriteLine("  -d, --document <path>   Stores a single file as a document, replacing any already");
         Console.WriteLine("                          stored under the same filename");
         Console.WriteLine("  -b, --beats <session>   Reads session beats from stdin; ctrl+Z undoes the last one");
-        Console.WriteLine("  -i, --index             Chunk and embed what is stored, making it searchable");
+        Console.WriteLine("  -i, --index <mode>      How a folder or document upload handles indexing, which");
+        Console.WriteLine("                          chunks and embeds a document to make it searchable");
+        Console.WriteLine("                          (default: new)");
+        Console.WriteLine("                            all      Ask for nothing, index every file uploaded");
+        Console.WriteLine("                            ask      Ask for every file, blank keeps what is stored");
+        Console.WriteLine("                            new      Ask only for new files, leave stored ones as they are");
+        Console.WriteLine("                            drop     Ask for nothing, remove every file uploaded from the index");
         Console.WriteLine("  -s, --summaries <mode>  How a folder or document upload handles summaries");
         Console.WriteLine("                          (default: missing)");
         Console.WriteLine("                            all      Ask for every file, blank keeps the stored one");

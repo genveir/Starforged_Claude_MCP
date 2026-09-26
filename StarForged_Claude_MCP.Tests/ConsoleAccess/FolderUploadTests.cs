@@ -43,7 +43,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         var prompt = await Upload(folder, SummaryMode.None);
 
-        prompt.Asked.Should().BeEmpty();
+        prompt.Summary.Asked.Should().BeEmpty();
         (await Db.GetDocument(Category, "notes.md"))!.Summary.Should().Be("A stored summary");
     }
 
@@ -58,7 +58,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         var prompt = await Upload(folder, SummaryMode.Drop);
 
-        prompt.Asked.Should().BeEmpty();
+        prompt.Summary.Asked.Should().BeEmpty();
         (await Db.GetDocument(Category, "notes.md"))!.Summary.Should().BeNull();
     }
 
@@ -81,7 +81,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             ["brand_new.md"] = "Typed for brand_new"
         });
 
-        prompt.Asked.Should().BeEquivalentTo(["has_none.md", "brand_new.md"],
+        prompt.Summary.Asked.Should().BeEquivalentTo(["has_none.md", "brand_new.md"],
             because: "a document that already has a summary is left alone in this mode");
 
         (await Db.GetDocument(Category, "has_one.md"))!.Summary.Should().Be("Already summarised");
@@ -100,8 +100,8 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         var prompt = await Upload(folder, SummaryMode.All, answers: new() { ["notes.md"] = "A freshly typed summary" });
 
-        prompt.Asked.Should().BeEquivalentTo(["notes.md"]);
-        prompt.Offered.Should().BeEquivalentTo(["The stored summary"],
+        prompt.Summary.Asked.Should().BeEquivalentTo(["notes.md"]);
+        prompt.Summary.Offered.Should().BeEquivalentTo(["The stored summary"],
             because: "the mode offers the stored summary so it can be kept by entering nothing");
         (await Db.GetDocument(Category, "notes.md"))!.Summary.Should().Be("A freshly typed summary");
     }
@@ -113,10 +113,12 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         using var folder = new TempFolder();
 
         folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
-        await Upload(folder, SummaryMode.None, indexed: true);
+        await Upload(folder, SummaryMode.None, index: IndexMode.All);
 
         folder.Write("reef.md", Markdown("Forge", "The blacksmith hammered the glowing iron on the anvil."));
-        await Upload(folder, SummaryMode.None, indexed: true);
+        var prompt = await Upload(folder, SummaryMode.None, index: IndexMode.All);
+
+        prompt.Index.Asked.Should().BeEmpty();
 
         var results = await Search("coral reef tropical fish");
 
@@ -126,18 +128,80 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task UploadFolder_WhenIndexingIsTurnedOffOnReplacement_ShouldRemoveWhatWasIndexed()
+    public async Task UploadFolder_WithIndexModeDrop_ShouldRemoveWhatWasIndexedWithoutPrompting()
     {
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
         folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
-        await Upload(folder, SummaryMode.None, indexed: true);
+        await Upload(folder, SummaryMode.None, index: IndexMode.All);
 
-        await Upload(folder, SummaryMode.None, indexed: false);
+        var prompt = await Upload(folder, SummaryMode.None, index: IndexMode.Drop);
 
+        prompt.Index.Asked.Should().BeEmpty();
         (await Search("coral reef tropical fish")).Should()
-            .BeEmpty(because: "a replacement without --index leaves nothing searchable behind");
+            .BeEmpty(because: "dropping the index leaves nothing searchable behind");
+    }
+
+    [Fact(Timeout = 60_000)]
+    public async Task UploadFolder_WithAccentedAndUnknownCharacters_ShouldIndexWithoutHanging()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("games.md", Markdown("Oracle: Favorite Video Game", "63 Planet Zoo\n64 Pokémon\n65 Portal"));
+        folder.Write("lunch.md", Markdown("Oracle: Random Food (Lunch)", "29 Smørrebrød with a side of Bún bò Huế"));
+
+        // Run off the test thread so the timeout can fail the test if the tokenizer ever loops again.
+        await Task.Run(() => Upload(folder, SummaryMode.None, index: IndexMode.All), TestContext.Current.CancellationToken);
+
+        (await Db.GetDocument(Category, "games.md"))!.Content.Should().Contain("Pokémon",
+            because: "only what is tokenized is normalized, never the stored document");
+        (await Search("pokemon video game")).Should().Contain(result => result.Text.Contains("Pokémon"),
+            because: "the chunk text keeps its accents too");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WithIndexModeNew_ShouldOnlyPromptForNewFilesAndLeaveStoredOnesAsTheyAre()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith hammered the glowing iron."));
+        await Upload(folder, SummaryMode.None, index: IndexMode.Ask, indexAnswers: new() { ["reef.md"] = true });
+
+        folder.Write("tundra.md", Markdown("Tundra", "Snow drifts across the frozen tundra."));
+        var prompt = await Upload(folder, SummaryMode.None, index: IndexMode.New, indexAnswers: new() { ["tundra.md"] = true });
+
+        prompt.Index.Asked.Should().BeEquivalentTo(["tundra.md"],
+            because: "a stored document keeps whether it was indexed in this mode");
+
+        (await Db.GetDocument(Category, "reef.md"))!.Indexed.Should().BeTrue();
+        (await Db.GetDocument(Category, "forge.md"))!.Indexed.Should().BeFalse();
+        (await Db.GetDocument(Category, "tundra.md"))!.Indexed.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task UploadFolder_WithIndexModeAsk_ShouldPromptForEveryFileAndOfferWhetherItIsIndexed()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith hammered the glowing iron."));
+        await Upload(folder, SummaryMode.None, index: IndexMode.Ask, indexAnswers: new() { ["reef.md"] = true });
+
+        folder.Write("tundra.md", Markdown("Tundra", "Snow drifts across the frozen tundra."));
+        var prompt = await Upload(folder, SummaryMode.None, index: IndexMode.Ask, indexAnswers: new() { ["forge.md"] = true });
+
+        prompt.Index.Asked.Should().BeEquivalentTo(["reef.md", "forge.md", "tundra.md"]);
+        prompt.Index.Offered.Should().BeEquivalentTo(new bool?[] { true, false, null },
+            because: "the mode offers whether a stored document is indexed so it can be kept by entering nothing");
+
+        (await Db.GetDocument(Category, "reef.md"))!.Indexed.Should().BeTrue();
+        (await Db.GetDocument(Category, "forge.md"))!.Indexed.Should().BeTrue();
+        (await Db.GetDocument(Category, "tundra.md"))!.Indexed.Should().BeFalse();
     }
 
     [Fact]
@@ -148,10 +212,10 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
         folder.Write("forge.md", Markdown("Forge", "The blacksmith hammered the glowing iron."));
-        await Upload(folder, SummaryMode.None, indexed: true);
+        await Upload(folder, SummaryMode.None, index: IndexMode.All);
 
         folder.Write("forge.md", Markdown("Forge", "The blacksmith quenched the glowing iron."));
-        var output = await UploadCapturingOutput(folder, SummaryMode.None, indexed: true);
+        var output = await UploadCapturingOutput(folder, SummaryMode.None, index: IndexMode.All);
 
         output.Should().Contain("Unchanged.");
         output.Should().Contain("0 document(s) stored, 1 replaced, 1 unchanged.");
@@ -184,7 +248,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
         await Upload(folder, SummaryMode.None);
 
-        var output = await UploadCapturingOutput(folder, SummaryMode.None, indexed: true);
+        var output = await UploadCapturingOutput(folder, SummaryMode.None, index: IndexMode.All);
 
         output.Should().Contain("Replaced: indexed.");
         (await Search("coral reef tropical fish")).Should().NotBeEmpty();
@@ -203,7 +267,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             new UploadOptions(Category, UploadMode.Document, SourcePath: Path.Combine(folder.Path, "chosen.md")),
             answers: new() { ["chosen.md"] = "Typed for chosen" });
 
-        prompt.Asked.Should().BeEquivalentTo(["chosen.md"]);
+        prompt.Summary.Asked.Should().BeEquivalentTo(["chosen.md"]);
 
         var documents = await Db.GetDocumentIndex(Category);
         documents.Should().ContainSingle(because: "only the named file is uploaded, not the rest of its folder")
@@ -220,7 +284,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await Db.StoreDocument("Campaign.Oracles", "moons.md", "# Moons", summary: null);
         folder.Write("overview.md", Markdown("Overview", "The campaign at a glance."));
 
-        await Run(new UploadOptions("Campaign", UploadMode.Folder, SourcePath: folder.Path, Indexed: false, Summaries: SummaryMode.None));
+        await Run(new UploadOptions("Campaign", UploadMode.Folder, SourcePath: folder.Path, Index: IndexMode.Drop, Summaries: SummaryMode.None));
 
         (await Db.GetDocumentIndex("Campaign")).Should().BeEmpty(because: "a category holds either documents or subcategories");
     }
@@ -234,7 +298,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await Db.StoreDocument("Campaign.Oracles", "moons.md", "# Moons", summary: null);
         folder.Write("red_moon.md", Markdown("The Red Moon", "It rises last."));
 
-        await Run(new UploadOptions("Campaign.Oracles.Moons", UploadMode.Folder, SourcePath: folder.Path, Indexed: false, Summaries: SummaryMode.None));
+        await Run(new UploadOptions("Campaign.Oracles.Moons", UploadMode.Folder, SourcePath: folder.Path, Index: IndexMode.Drop, Summaries: SummaryMode.None));
 
         (await Db.GetDocumentIndex("Campaign.Oracles.Moons")).Should().BeEmpty();
     }
@@ -321,19 +385,21 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
     private static string Markdown(string header, string body) =>
         $"# {header}{Environment.NewLine}{Environment.NewLine}{body}";
 
-    private async Task<RecordingSummaryPrompt> Upload(
+    private async Task<Prompts> Upload(
         TempFolder folder,
         SummaryMode summaries,
-        bool indexed = false,
-        Dictionary<string, string>? answers = null) =>
+        IndexMode index = IndexMode.Drop,
+        Dictionary<string, string>? answers = null,
+        Dictionary<string, bool>? indexAnswers = null) =>
         await Run(
-            new UploadOptions(Category, UploadMode.Folder, SourcePath: folder.Path, Indexed: indexed, Summaries: summaries),
-            answers);
+            new UploadOptions(Category, UploadMode.Folder, SourcePath: folder.Path, Index: index, Summaries: summaries),
+            answers,
+            indexAnswers);
 
     private async Task<string> UploadCapturingOutput(
         TempFolder folder,
         SummaryMode summaries,
-        bool indexed = false,
+        IndexMode index = IndexMode.Drop,
         Dictionary<string, string>? answers = null)
     {
         var original = Console.Out;
@@ -342,7 +408,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         try
         {
-            await Upload(folder, summaries, indexed, answers);
+            await Upload(folder, summaries, index, answers);
         }
         finally
         {
@@ -352,19 +418,23 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         return output.ToString();
     }
 
-    private async Task<RecordingSummaryPrompt> Run(UploadOptions options, Dictionary<string, string>? answers = null)
+    private async Task<Prompts> Run(
+        UploadOptions options,
+        Dictionary<string, string>? answers = null,
+        Dictionary<string, bool>? indexAnswers = null)
     {
-        var prompt = new RecordingSummaryPrompt(answers ?? []);
+        var prompts = new Prompts(new RecordingSummaryPrompt(answers ?? []), new RecordingIndexPrompt(indexAnswers ?? []));
 
         var uploader = new FileUploader(
             _fixture.Services.GetRequiredService<IDocumentProcessingService>(),
             Db,
             new BeatPreprocessor(),
-            prompt);
+            prompts.Summary,
+            prompts.Index);
 
         await uploader.UploadFile(options, CancellationToken.None);
 
-        return prompt;
+        return prompts;
     }
 
     private async Task<SearchResult[]> Search(string query) =>
@@ -387,4 +457,24 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
             return answers.TryGetValue(filename, out var answer) ? answer : existingSummary;
         }
     }
+
+    /// <summary>
+    /// Answers index prompts by filename the way <see cref="RecordingSummaryPrompt"/> does; a file without
+    /// an answer keeps whether it is indexed, as a blank answer would.
+    /// </summary>
+    private sealed class RecordingIndexPrompt(Dictionary<string, bool> answers) : IIndexPrompt
+    {
+        public List<string> Asked { get; } = [];
+        public List<bool?> Offered { get; } = [];
+
+        public bool Ask(string filename, bool? currentlyIndexed)
+        {
+            Asked.Add(filename);
+            Offered.Add(currentlyIndexed);
+
+            return answers.TryGetValue(filename, out var answer) ? answer : currentlyIndexed ?? false;
+        }
+    }
+
+    private sealed record Prompts(RecordingSummaryPrompt Summary, RecordingIndexPrompt Index);
 }

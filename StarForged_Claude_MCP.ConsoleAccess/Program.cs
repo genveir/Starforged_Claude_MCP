@@ -82,6 +82,7 @@ public class Program
         services.AddSingleton<CategoryLister>();
         services.AddSingleton<BeatPreprocessor>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
+        services.AddSingleton<IIndexPrompt, ConsoleIndexPrompt>();
         services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
         services.AddEmbeddingsServices();
     }
@@ -115,8 +116,8 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index] [--summaries <mode>]");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index] [--summaries <mode>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite]");
