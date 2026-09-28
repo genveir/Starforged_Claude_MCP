@@ -25,8 +25,10 @@ public class RollDiceTool : ITool
             type = "object",
             properties = new
             {
+                purpose = new { type = "string", description = "State, before rolling, what this roll decides and how you will read the result." },
                 add = new { type = "number", description = "Total to add to the action die: the relevant stat plus any other adds. Defaults to 0." }
-            }
+            },
+            required = new[] { "purpose" }
         }
     };
 

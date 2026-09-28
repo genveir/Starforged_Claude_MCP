@@ -10,11 +10,13 @@ namespace StarForged_Claude_MCP.Tests.Server.Unit;
 
 public class RollDiceToolTests
 {
+    private const string Purpose = "Face Danger: a hit means I cross the gap, a miss means I fall";
+
     [Fact]
     public async Task RollDice_ShouldReturnTheResolvedRollUnderTheNamesTheModelReads()
     {
         var payload = await CallRollDiceAsync(
-            arguments: new Dictionary<string, object> { ["add"] = 3 },
+            arguments: new Dictionary<string, object> { ["purpose"] = Purpose, ["add"] = 3 },
             actionDie: 4,
             firstChallengeDie: 2,
             secondChallengeDie: 10);
@@ -32,7 +34,7 @@ public class RollDiceToolTests
     public async Task RollDice_WithoutAnAdd_ShouldTreatTheAddAsZero()
     {
         var payload = await CallRollDiceAsync(
-            arguments: new Dictionary<string, object>(),
+            arguments: new Dictionary<string, object> { ["purpose"] = Purpose },
             actionDie: 4,
             firstChallengeDie: 2,
             secondChallengeDie: 10);

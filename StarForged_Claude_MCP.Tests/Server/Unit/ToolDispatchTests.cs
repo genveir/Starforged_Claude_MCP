@@ -183,7 +183,7 @@ public class ToolDispatchTests
                 documents.Verify(f => f.GetCanonicalBeatsAsync(Category, 5), Times.Once)),
 
         ["roll_dice"] = new ToolCase(
-            Arguments: new Dictionary<string, object>(),
+            Arguments: new Dictionary<string, object> { ["purpose"] = "Face Danger: a hit means I cross the gap" },
             VerifyDispatch: (embeddings, documents, permissions) =>
             {
                 embeddings.VerifyNoOtherCalls();
