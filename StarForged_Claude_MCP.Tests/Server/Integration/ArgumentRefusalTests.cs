@@ -47,29 +47,6 @@ public class ArgumentRefusalTests : McpServerTestBase
     }
 
     [Fact]
-    public async Task GetCanonicalBeats_WithoutSessionNumber_ShouldSayWhichArgumentIsMissing()
-    {
-        var response = await CallTool("4", "get_canonical_beats", new Dictionary<string, object>
-        {
-            ["category"] = Category
-        });
-
-        response.ShouldHaveBeenRefused().Should().Contain("SessionNumber is required");
-    }
-
-    [Fact]
-    public async Task GetCanonicalBeats_WithSessionNumberAsText_ShouldBeRefusedRatherThanParsed()
-    {
-        var response = await CallTool("5", "get_canonical_beats", new Dictionary<string, object>
-        {
-            ["category"] = Category,
-            ["sessionNumber"] = "5"
-        });
-
-        response.ShouldHaveBeenRefused().Should().Contain("SessionNumber").And.Contain("whole number");
-    }
-
-    [Fact]
     public async Task SearchIndex_WithTopKAsText_ShouldBeRefusedRatherThanParsed()
     {
         var response = await CallTool("6", "search_index", new Dictionary<string, object>
@@ -119,8 +96,6 @@ public class ArgumentRefusalTests : McpServerTestBase
     [InlineData("retrieve_search_results", """{"ids":["7"]}""", "Ids entries")]
     [InlineData("retrieve_search_results", """{"ids":7}""", "list of whole numbers")]
     [InlineData("retrieve_search_results", "{}", "Ids is required")]
-    [InlineData("get_canonical_beats", """{"category":"lore","sessionNumber":"5"}""", "SessionNumber")]
-    [InlineData("get_canonical_beats", """{"category":"lore"}""", "SessionNumber is required")]
     [InlineData("add_document", """{"category":"lore","filename":"w.md","text":"# W","indexed":"false"}""", "true or false")]
     [InlineData("search_index", """{"query":"q","category":"lore","topK":3.5}""", "TopK")]
     public async Task MalformedArgument_ArrivingAsJson_ShouldBeRefusedInTermsTheCallerCanAct(

@@ -92,7 +92,6 @@ public class CategoryHierarchyTests : McpServerTestBase
     [InlineData("list_documents")]
     [InlineData("get_document")]
     [InlineData("get_document_summary")]
-    [InlineData("get_canonical_beats")]
     [InlineData("request_write_permission")]
     public async Task LeafTool_OnAParentCategory_ShouldBeRefusedWithTheLeavesUnderIt(string toolName)
     {
@@ -103,8 +102,7 @@ public class CategoryHierarchyTests : McpServerTestBase
         var response = await CallTool("3", toolName, new Dictionary<string, object>
         {
             ["category"] = Parent,
-            ["filename"] = "moons.md",
-            ["sessionNumber"] = 1
+            ["filename"] = "moons.md"
         });
 
         response.ShouldHaveBeenRefused().Should().Contain("parent category").And.Contain(Oracles).And.Contain(Sessions);

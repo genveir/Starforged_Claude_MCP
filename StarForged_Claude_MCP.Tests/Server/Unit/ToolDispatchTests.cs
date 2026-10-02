@@ -173,15 +173,6 @@ public class ToolDispatchTests
             VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.GetDocumentIndexAsync(Category), Times.Once)),
 
-        ["get_canonical_beats"] = new ToolCase(
-            Arguments: new Dictionary<string, object>
-            {
-                ["category"] = Category,
-                ["sessionNumber"] = 5
-            },
-            VerifyDispatch: (embeddings, documents, permissions) =>
-                documents.Verify(f => f.GetCanonicalBeatsAsync(Category, 5), Times.Once)),
-
         ["roll_dice"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["purpose"] = "Face Danger: a hit means I cross the gap" },
             VerifyDispatch: (embeddings, documents, permissions) =>
@@ -347,8 +338,6 @@ public class ToolDispatchTests
             .ReturnsAsync(new List<string>());
         mock.Setup(f => f.FindTextAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<bool>(), It.IsAny<string?>()))
             .ReturnsAsync(new TextSearchResult(TotalMatches: 0, Truncated: false, Documents: []));
-        mock.Setup(f => f.GetCanonicalBeatsAsync(It.IsAny<string>(), It.IsAny<int>()))
-            .ReturnsAsync(new List<Beat>());
 
         return mock;
     }

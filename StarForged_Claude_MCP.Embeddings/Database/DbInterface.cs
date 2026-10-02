@@ -222,52 +222,11 @@ public class DbInterface
         await connection.ExecuteAsync("delete from Embeddings");
     }
 
-    // ---------- Beats ----------
-
-    public async Task<int> StoreBeat(string category, int sessionNumber, int? beatNumber, int? version, string content)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        return await connection.QuerySingleAsync<int>(
-            """
-            insert into Beats (Category, SessionNumber, BeatNumber, Version, Content)
-            output inserted.Id
-            values (@Category, @SessionNumber, @BeatNumber, @Version, @Content)
-            """,
-            new { Category = category, SessionNumber = sessionNumber, BeatNumber = beatNumber, Version = version, Content = content });
-    }
-
-    public async Task<List<Beat>> GetBeatsForSession(string category, int sessionNumber)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<Beat>(
-            """
-            select Id, SessionNumber, BeatNumber, Version, Content
-            from Beats
-            where Category = @Category and SessionNumber = @SessionNumber
-            order by Id
-            """,
-            new { Category = category, SessionNumber = sessionNumber });
-        return results.ToList();
-    }
-
-    public async Task DeleteBeat(int id)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Beats where Id = @Id", new { Id = id });
-    }
-
-    public async Task DeleteAllBeats()
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Beats");
-    }
-
     public async Task TestConnection()
     {
         using var connection = new SqlConnection(_connectionString);
         await connection.QueryAsync<dynamic>("select top 0 Id, Category, Filename, Content, Summary from Documents");
         await connection.QueryAsync<dynamic>("select top 0 Id, DocumentId, Text, Vector, TokenCount from Embeddings");
-        await connection.QueryAsync<dynamic>("select top 0 Id, Category, SessionNumber, BeatNumber, Version, Content from Beats");
     }
 
     private static byte[] FloatsToBytes(float[] floats)

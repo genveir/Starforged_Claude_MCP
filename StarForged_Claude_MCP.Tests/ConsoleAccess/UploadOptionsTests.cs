@@ -43,10 +43,6 @@ public class UploadOptionsTests
     [InlineData("lore", "--folder", @".\in", "--index")]
     [InlineData("lore", "--folder", @".\in", "--index", "--summaries", "none")]
     [InlineData("lore", "--folder", @".\in", "--index", "sometimes")]
-    [InlineData("log", "--beats", "3", "--index", "all")]
-    [InlineData("log", "--beats", "3", "--summaries", "none")]
-    [InlineData("log", "--beats", "3", "--dry-run")]
-    [InlineData("log", "--beats", "3", "--verbosity", "changed")]
     [InlineData("lore", "--folder", @".\in", "-v", "some")]
     public void Parse_WithMissingOrInvalidArguments_ShouldReturnNull(params string[] args)
     {

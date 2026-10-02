@@ -1,8 +1,6 @@
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
-using System.Collections.Concurrent;
-using System.Text;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
@@ -10,38 +8,23 @@ public class FileUploader
 {
     private readonly IDocumentProcessingService documentProcessingService;
     private readonly DbInterface dbInterface;
-    private readonly BeatPreprocessor beatPreprocessor;
     private readonly ISummaryPrompt summaryPrompt;
     private readonly IIndexPrompt indexPrompt;
 
     public FileUploader(
         IDocumentProcessingService documentProcessingService,
         DbInterface dbInterface,
-        BeatPreprocessor beatPreprocessor,
         ISummaryPrompt summaryPrompt,
         IIndexPrompt indexPrompt)
     {
         this.documentProcessingService = documentProcessingService;
         this.dbInterface = dbInterface;
-        this.beatPreprocessor = beatPreprocessor;
         this.summaryPrompt = summaryPrompt;
         this.indexPrompt = indexPrompt;
     }
 
-    public async Task UploadFile(UploadOptions options, CancellationToken cancellationToken)
+    public async Task UploadFile(UploadOptions options)
     {
-        if (options.Mode == UploadMode.Folder && !Directory.Exists(options.SourcePath))
-        {
-            Console.Error.WriteLine($"Error: Folder '{options.SourcePath}' does not exist.");
-            return;
-        }
-
-        if (options.Mode == UploadMode.Document && !File.Exists(options.SourcePath))
-        {
-            Console.Error.WriteLine($"Error: File '{options.SourcePath}' does not exist.");
-            return;
-        }
-
         if (options.DryRun)
         {
             Console.WriteLine("Dry run: nothing will be stored, replaced or indexed, and nothing will be asked.");
@@ -50,18 +33,24 @@ public class FileUploader
         switch (options.Mode)
         {
             case UploadMode.Folder:
+                if (!Directory.Exists(options.SourcePath))
+                {
+                    Console.Error.WriteLine($"Error: Folder '{options.SourcePath}' does not exist.");
+                    return;
+                }
                 await UploadFolderAsync(
-                    options.Category, options.SourcePath!, options.Index, options.Summaries, options.DryRun, options.Verbosity);
+                    options.Category, options.SourcePath, options.Index, options.Summaries, options.DryRun, options.Verbosity);
                 break;
             case UploadMode.Document:
+                if (!File.Exists(options.SourcePath))
+                {
+                    Console.Error.WriteLine($"Error: File '{options.SourcePath}' does not exist.");
+                    return;
+                }
                 if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
                 await UploadFilesAsync(
-                    options.Category, [options.SourcePath!], options.Index, options.Summaries, options.DryRun, options.Verbosity,
+                    options.Category, [options.SourcePath], options.Index, options.Summaries, options.DryRun, options.Verbosity,
                     isOutermost: true);
-                break;
-            case UploadMode.Beats:
-                if (!await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)) return;
-                await RunBeatsAsync(options.Category, options.SessionNumber, cancellationToken);
                 break;
             default:
                 throw new ArgumentException($"Invalid upload mode {options.Mode}");
@@ -245,28 +234,6 @@ public class FileUploader
         }
     }
 
-    private async Task RunBeatsAsync(string category, int sessionNumber, CancellationToken cancellationToken)
-    {
-        Console.WriteLine($"Listening on stdin. Category: {category}. Session: {sessionNumber}. Press Ctrl+C to exit.");
-        Console.WriteLine(await FormatLoggedBeatsAsync(category, sessionNumber));
-
-        await RunStdinLoopAsync(
-            store: async content =>
-            {
-                var (beatNumber, version, beatContent) = beatPreprocessor.Process(content);
-                var id = await dbInterface.StoreBeat(category, sessionNumber, beatNumber, version, beatContent);
-
-                var label = beatNumber == null ? "unnumbered" : $"{beatNumber}.{version}";
-                return (Id: id, Message: $"  Stored beat [{label}]\n{await FormatLoggedBeatsAsync(category, sessionNumber)}");
-            },
-            undo: async id =>
-            {
-                await dbInterface.DeleteBeat(id);
-                return $"  Undone: removed the last beat.\n{await FormatLoggedBeatsAsync(category, sessionNumber)}";
-            },
-            cancellationToken);
-    }
-
     private static string? ResolveSummary(string filename, string? existingSummary, SummaryMode summaries, ISummaryPrompt prompt) => summaries switch
     {
         SummaryMode.All => prompt.Ask(filename, existingSummary),
@@ -330,118 +297,6 @@ public class FileUploader
         }
 
         return changes;
-    }
-
-    private async Task<string> FormatLoggedBeatsAsync(string category, int sessionNumber)
-    {
-        var beats = await dbInterface.GetBeatsForSession(category, sessionNumber);
-        var display = string.Join(", ", beats.Select(b => b.BeatNumber == null ? "None" : $"{b.BeatNumber}.{b.Version}"));
-        return $"Currently logged beats: [{display}]";
-    }
-
-    private static async Task RunStdinLoopAsync(
-        Func<string, Task<(int Id, string Message)>> store,
-        Func<int, Task<string>> undo,
-        CancellationToken cancellationToken)
-    {
-        const string UndoSentinel = "\x1A";
-
-        var lines = new ConcurrentQueue<string>();
-        var dataAvailable = new SemaphoreSlim(0);
-
-        var readerThread = new Thread(() =>
-        {
-            if (Console.IsInputRedirected)
-            {
-                string? line;
-                while ((line = Console.ReadLine()) != null)
-                {
-                    lines.Enqueue(line);
-                    dataAvailable.Release();
-                }
-            }
-            else
-            {
-                var lineBuilder = new StringBuilder();
-                while (true)
-                {
-                    if (Console.KeyAvailable)
-                    {
-                        var key = Console.ReadKey(intercept: true);
-                        if (key.KeyChar is '\n' or '\r' || key.Key == ConsoleKey.Enter)
-                        {
-                            lines.Enqueue(lineBuilder.ToString());
-                            lineBuilder.Clear();
-                            dataAvailable.Release();
-                        }
-                        else if (key.Key == ConsoleKey.Z && (key.Modifiers & ConsoleModifiers.Control) != 0)
-                        {
-                            lines.Enqueue(UndoSentinel);
-                            dataAvailable.Release();
-                        }
-                        else if (key.KeyChar != '\0')
-                        {
-                            lineBuilder.Append(key.KeyChar);
-                        }
-                    }
-                    else
-                    {
-                        if (lineBuilder.Length > 0)
-                        {
-                            lines.Enqueue(lineBuilder.ToString());
-                            lineBuilder.Clear();
-                            dataAvailable.Release();
-                        }
-                        Thread.Sleep(10);
-                    }
-                }
-            }
-        })
-        { IsBackground = true };
-
-        readerThread.Start();
-
-        var undoStack = new Stack<int>();
-        var buffer = new StringBuilder();
-
-        try
-        {
-            while (!cancellationToken.IsCancellationRequested)
-            {
-                int timeout = buffer.Length > 0 ? 100 : Timeout.Infinite;
-                bool gotSignal = await dataAvailable.WaitAsync(timeout, cancellationToken);
-
-                if (gotSignal)
-                {
-                    while (lines.TryDequeue(out var line))
-                    {
-                        if (line == UndoSentinel)
-                        {
-                            if (undoStack.Count == 0)
-                            {
-                                Console.WriteLine("  Nothing to undo.");
-                                continue;
-                            }
-                            Console.WriteLine(await undo(undoStack.Pop()));
-                        }
-                        else
-                        {
-                            buffer.AppendLine(line);
-                        }
-                    }
-                }
-                else if (buffer.Length > 0)
-                {
-                    var content = buffer.ToString();
-                    buffer.Clear();
-
-                    var (id, message) = await store(content);
-                    undoStack.Push(id);
-                    Console.WriteLine(message);
-                }
-            }
-        }
-        catch (OperationCanceledException) { }
     }
 
     private sealed record LeafUpload(string Category, string[] Files);

@@ -43,7 +43,6 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "get_document",
             "get_document_summary",
             "list_documents",
-            "get_canonical_beats",
             "roll_dice",
             "request_write_permission",
             "release_write_permission");
@@ -73,23 +72,5 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             else if (name != "release_write_permission")
                 description.Should().StartWith("Leaf category", because: "'{0}' refuses a parent category", name);
         }
-    }
-
-    [Fact]
-    public async Task ToolsList_ShouldNotAdvertiseAWriteToolForBeats()
-    {
-        var request = new JsonRpcRequest
-        {
-            Id = "3",
-            Method = "tools/list",
-            Params = new { }
-        };
-
-        var result = JsonSerializer.Deserialize<ToolsListResult>(
-            JsonSerializer.Serialize((await InvokeServerMethod(request)).Result, _jsonOptions),
-            _jsonOptions);
-
-        result!.Tools.Should().NotContain(t => t.Name.Contains("beat") && t.Name != "get_canonical_beats",
-            because: "beats are written by pasting into the console, so that the GM's output never enters context twice");
     }
 }

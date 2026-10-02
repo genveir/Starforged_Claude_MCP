@@ -94,9 +94,6 @@ public class DocumentsFacade : IDocumentsFacade
         return DocumentTextSearch.Search(candidates, text, wholeWord);
     }
 
-    public async Task<List<Beat>> GetCanonicalBeatsAsync(string category, int sessionNumber) =>
-        CanonicalBeats.Select(await _dbInterface.GetBeatsForSession(category, sessionNumber));
-
     public async Task<List<string>> GetSubcategoriesAsync(string category) =>
         await _dbInterface.GetCategoriesUnder(category);
 

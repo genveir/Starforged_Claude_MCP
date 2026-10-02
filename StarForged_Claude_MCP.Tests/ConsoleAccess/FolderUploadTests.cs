@@ -523,11 +523,10 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         var uploader = new FileUploader(
             _fixture.Services.GetRequiredService<IDocumentProcessingService>(),
             Db,
-            new BeatPreprocessor(),
             prompts.Summary,
             prompts.Index);
 
-        await uploader.UploadFile(options, CancellationToken.None);
+        await uploader.UploadFile(options);
 
         return prompts;
     }

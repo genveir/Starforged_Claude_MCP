@@ -21,13 +21,6 @@ public class DownloadOptionsTests
     }
 
     [Fact]
-    public void Parse_Beats_ShouldTakeTheSessionNumberFromTheFlag()
-    {
-        DownloadOptions.Parse(["log", "s3.md", "--beats", "3"]).Should()
-            .Be(new DownloadOptions("log", "s3.md", DownloadMode.Beats, SessionNumber: 3));
-    }
-
-    [Fact]
     public void Parse_ShortOverwriteFlag_ShouldSetOverwrite()
     {
         DownloadOptions.Parse(["lore", @".\out", "-f", "-o"])!.Overwrite.Should().BeTrue();
@@ -44,7 +37,6 @@ public class DownloadOptionsTests
     [Theory]
     [InlineData("lore", @".\out", "--folder", "--dry-run")]
     [InlineData("lore", "ship.md", "--document", "ship.md", "-n")]
-    [InlineData("log", "s3.md", "--beats", "3", "--dry-run")]
     public void Parse_DryRunFlag_ShouldSetDryRunInEveryMode(params string[] args)
     {
         DownloadOptions.Parse(args)!.DryRun.Should().BeTrue();
@@ -61,9 +53,7 @@ public class DownloadOptionsTests
     [Theory]
     [InlineData("lore", "--folder")]
     [InlineData("lore", "ship.md", "--document", "ship.md", "--clean")]
-    [InlineData("log", "s3.md", "--beats", "3", "-c")]
     [InlineData("lore", @".\out")]
-    [InlineData("lore", "s3.md", "--beats", "three")]
     [InlineData("lore", "ship.md", "--document")]
     [InlineData("lore", @".\out", "--folder", "--index")]
     [InlineData("lore", @".\out", "--folder", "--verbosity")]

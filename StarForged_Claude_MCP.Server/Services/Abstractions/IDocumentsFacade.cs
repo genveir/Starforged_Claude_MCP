@@ -43,8 +43,6 @@ public interface IDocumentsFacade
     /// </summary>
     Task<TextSearchResult?> FindTextAsync(string category, string text, bool wholeWord, string? filename);
 
-    Task<List<Beat>> GetCanonicalBeatsAsync(string category, int sessionNumber);
-
     /// <summary>
     /// The categories holding documents anywhere under this one. Empty exactly when it is a leaf.
     /// </summary>

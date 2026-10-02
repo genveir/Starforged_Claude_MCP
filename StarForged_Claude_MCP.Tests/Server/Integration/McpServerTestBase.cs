@@ -38,8 +38,6 @@ public abstract class McpServerTestBase
 
     protected async Task ClearTestDocuments() => await Db.DeleteAllDocuments();
 
-    protected async Task ClearTestBeats() => await Db.DeleteAllBeats();
-
     protected async Task<JsonRpcResponse> CallTool(string id, string name, Dictionary<string, object> arguments) =>
         await InvokeServerMethod(new JsonRpcRequest
         {

@@ -302,72 +302,6 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     }
 
     [Fact]
-    public async Task DownloadBeats_ShouldWriteTheCanonicalSessionToOneFile()
-    {
-        await ClearTestBeats();
-        using var folder = new TempFolder();
-
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The original arrival.\n");
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: null, version: null, content: "Interlude: rivals plotted.\n");
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 1, content: "Beat 1.1 The corrected arrival.\n");
-        await Db.StoreBeat(Category, sessionNumber: 4, beatNumber: 1, version: 0, content: "Beat 1.0 Another session.\n");
-
-        var target = Path.Combine(folder.Path, "session3.md");
-        await Download(new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3));
-
-        var separator = Environment.NewLine + Environment.NewLine;
-        File.ReadAllText(target).Should().Be(
-            "Beat 1.1 The corrected arrival." + separator + "Interlude: rivals plotted." + Environment.NewLine,
-            because: "a rewritten beat keeps its original place and superseded versions are dropped");
-    }
-
-    [Fact]
-    public async Task DownloadBeats_WhenTheFileExists_ShouldOnlyReplaceItWithOverwrite()
-    {
-        await ClearTestBeats();
-        using var folder = new TempFolder();
-
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The arrival.");
-        folder.Write("session3.md", "Local content.");
-        var target = Path.Combine(folder.Path, "session3.md");
-
-        await Download(new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3));
-        File.ReadAllText(target).Should().Be("Local content.", because: "an existing file is left alone by default");
-
-        await Download(new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true));
-        File.ReadAllText(target).Should().StartWith("Beat 1.0 The arrival.");
-    }
-
-    [Fact]
-    public async Task DownloadBeats_ShouldReportWhetherTheFileWasNewOverwrittenOrUnchanged()
-    {
-        await ClearTestBeats();
-        using var folder = new TempFolder();
-
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The arrival.");
-        var target = Path.Combine(folder.Path, "session3.md");
-        var options = new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true);
-
-        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (new).");
-        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (unchanged).");
-
-        folder.Write("session3.md", "Local content.");
-        (await DownloadCapturingOutput(options)).Should().Contain($"{target} (overwritten).");
-    }
-
-    [Fact]
-    public async Task DownloadBeats_WhenTheSessionHasNoBeats_ShouldWriteNothing()
-    {
-        await ClearTestBeats();
-        using var folder = new TempFolder();
-
-        var target = Path.Combine(folder.Path, "session9.md");
-        await Download(new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 9));
-
-        File.Exists(target).Should().BeFalse();
-    }
-
-    [Fact]
     public async Task DownloadFolder_WithClean_ShouldListAndDeleteOnlyStrayMarkdownOnceConfirmed()
     {
         await ClearTestDocuments();
@@ -543,23 +477,6 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         output.Should().Contain($"{target} (would be new)");
         File.Exists(target).Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task DownloadBeats_WithDryRun_ShouldReportWithoutWriting()
-    {
-        await ClearTestBeats();
-        using var folder = new TempFolder();
-
-        await Db.StoreBeat(Category, sessionNumber: 3, beatNumber: 1, version: 0, content: "Beat 1.0 The arrival.");
-        folder.Write("session3.md", "Local content.");
-        var target = Path.Combine(folder.Path, "session3.md");
-
-        var output = await DownloadCapturingOutput(
-            new DownloadOptions(Category, target, DownloadMode.Beats, SessionNumber: 3, Overwrite: true, DryRun: true));
-
-        output.Should().Contain($"Would download 1 beat(s) of session 3 to {target} (would be overwritten).");
-        File.ReadAllText(target).Should().Be("Local content.");
     }
 
     private readonly RecordingConfirmPrompt confirmPrompt = new();

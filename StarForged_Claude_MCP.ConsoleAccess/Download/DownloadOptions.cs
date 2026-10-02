@@ -1,13 +1,12 @@
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
-public enum DownloadMode { Folder, Document, Beats }
+public enum DownloadMode { Folder, Document }
 
 public record DownloadOptions(
     string Category,
     string TargetPath,
     DownloadMode Mode,
     string? Filename = null,
-    int SessionNumber = 0,
     bool Overwrite = false,
     bool Clean = false,
     bool DryRun = false,
@@ -33,7 +32,6 @@ public record DownloadOptions(
 
         DownloadMode? mode = null;
         string? filename = null;
-        int sessionNumber = 0;
         bool overwrite = false;
         bool clean = false;
         bool dryRun = false;
@@ -52,16 +50,6 @@ public record DownloadOptions(
                     if (i + 1 >= rest.Length) { PrintUsage(); return null; }
                     mode = DownloadMode.Document;
                     filename = rest[++i];
-                    break;
-                case "--beats":
-                case "-b":
-                    if (i + 1 >= rest.Length || !int.TryParse(rest[++i], out sessionNumber))
-                    {
-                        Console.Error.WriteLine("Error: --beats needs a session number.");
-                        PrintUsage();
-                        return null;
-                    }
-                    mode = DownloadMode.Beats;
                     break;
                 case "--overwrite":
                 case "-o":
@@ -104,7 +92,7 @@ public record DownloadOptions(
             return null;
         }
 
-        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean, dryRun, verbosity);
+        return new DownloadOptions(category, targetPath, mode.Value, filename, overwrite, clean, dryRun, verbosity);
     }
 
     public static void PrintUsage()
@@ -118,7 +106,6 @@ public record DownloadOptions(
         Console.WriteLine("                          parent category, each leaf under it gets its own nested folder");
         Console.WriteLine("  -d, --document <name>   Writes one document to the file <path>; if <path> is a folder");
         Console.WriteLine("                          (existing, or ending in a slash) it is written under its own name");
-        Console.WriteLine("  -b, --beats <session>   Writes the session's canonical beats to the file <path>");
         Console.WriteLine("  -o, --overwrite         Replace existing files instead of skipping them");
         Console.WriteLine("  -c, --clean             With --folder: delete the .md files in <path> that are not part of the");
         Console.WriteLine("                          download, after listing them and asking; folders starting with a");

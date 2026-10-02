@@ -27,9 +27,9 @@ public class Program
 
         ConfigureServices(builder.Services);
 
-        var host = builder.Build();
-
-        await host.StartAsync();
+        // Built but never started: there are no hosted services, and starting it would install the console
+        // lifetime, which swallows Ctrl+C instead of letting it end the command.
+        using var host = builder.Build();
 
         // Startup validation
         try
@@ -39,7 +39,6 @@ public class Program
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Startup validation failed: {ex.Message}");
-            await host.StopAsync();
             return;
         }
 
@@ -48,12 +47,11 @@ public class Program
         var printer = host.Services.GetRequiredService<DocumentPrinter>();
         var searcher = host.Services.GetRequiredService<Searcher>();
         var lister = host.Services.GetRequiredService<CategoryLister>();
-        var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
         switch (options)
         {
             case UploadOptions uploadOptions:
-                await uploader.UploadFile(uploadOptions, lifetime.ApplicationStopping);
+                await uploader.UploadFile(uploadOptions);
                 break;
             case DownloadOptions downloadOptions:
                 await downloader.DownloadFile(downloadOptions);
@@ -69,8 +67,6 @@ public class Program
                 break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
-
-        await host.StopAsync();
     }
 
     internal static void ConfigureServices(IServiceCollection services)
@@ -80,7 +76,6 @@ public class Program
         services.AddSingleton<DocumentPrinter>();
         services.AddSingleton<Searcher>();
         services.AddSingleton<CategoryLister>();
-        services.AddSingleton<BeatPreprocessor>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
         services.AddSingleton<IIndexPrompt, ConsoleIndexPrompt>();
         services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
@@ -118,10 +113,8 @@ public class Program
         Console.WriteLine("Usage:");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>] [--dry-run] [--verbosity <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>] [--dry-run] [--verbosity <mode>]");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean] [--dry-run] [--verbosity <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite] [--dry-run]");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --beats <sessionNumber> [--overwrite] [--dry-run]");
         Console.WriteLine("  .\\ConsoleAccess.exe cat <category> <filename>");
         Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
         Console.WriteLine("  .\\ConsoleAccess.exe list");

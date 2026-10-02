@@ -1,6 +1,5 @@
 using StarForged_Claude_MCP.Embeddings.Database;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
-using StarForged_Claude_MCP.Embeddings.Services;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
@@ -32,9 +31,6 @@ public class FileDownloader
                 break;
             case DownloadMode.Document:
                 await DownloadDocumentAsync(options.Category, options.Filename!, options.TargetPath, options.Overwrite, options.DryRun);
-                break;
-            case DownloadMode.Beats:
-                await DownloadBeatsAsync(options.Category, options.SessionNumber, options.TargetPath, options.Overwrite, options.DryRun);
                 break;
             default:
                 throw new ArgumentException($"Invalid download mode {options.Mode}");
@@ -339,28 +335,6 @@ public class FileDownloader
 
         if (!dryRun) await WriteAsync(path, document.Content, existing);
         Console.WriteLine($"{filename} -> {path} {DescribeWrite(existing, dryRun)}");
-    }
-
-    private async Task DownloadBeatsAsync(string category, int sessionNumber, string path, bool overwrite, bool dryRun)
-    {
-        var beats = CanonicalBeats.Select(await dbInterface.GetBeatsForSession(category, sessionNumber));
-
-        if (beats.Count == 0)
-        {
-            Console.Error.WriteLine($"No beats found for session {sessionNumber} in category '{category}'.");
-            return;
-        }
-
-        var separator = Environment.NewLine + Environment.NewLine;
-        var content = string.Join(separator, beats.Select(b => b.Content.TrimEnd())) + Environment.NewLine;
-
-        var existing = await CompareWithExistingAsync(path, content);
-        if (!CanWrite(path, existing, overwrite, dryRun)) return;
-
-        if (!dryRun) await WriteAsync(path, content, existing);
-        Console.WriteLine(
-            $"{(dryRun ? "Would download" : "Downloaded")} {beats.Count} beat(s) of session {sessionNumber} to {path} " +
-            $"{DescribeWrite(existing, dryRun)}.");
     }
 
     /// <summary>
