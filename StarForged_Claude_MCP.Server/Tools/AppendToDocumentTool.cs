@@ -21,7 +21,7 @@ public class AppendToDocumentTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "append_to_document",
-        Description = "Adds text to the end of a document, or to the end of one of its sections, without rewriting what is already there. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+        Description = "Adds text to the end of a document, or to the end of one of its sections, without rewriting what is already there. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category. tag::section-editing",
         InputSchema = new
         {
             type = "object",

@@ -19,7 +19,7 @@ public class RollDiceTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "roll_dice",
-        Description = "Rolls the dice for an Ironsworn action roll: one d6 (action die) and two d10s (challenge dice). Resolves the roll and returns actionScore (action die plus add, uncapped), resultType (\"strong hit\", \"weak hit\" or \"miss\"), match (whether the two challenge dice are equal), and d100 (the challenge dice read as an oracle roll, the first as the tens digit).",
+        Description = "Rolls the dice for an Ironsworn action roll: one d6 (action die) and two d10s (challenge dice). Resolves the roll and returns actionScore (action die plus add, uncapped), resultType (\"strong hit\", \"weak hit\" or \"miss\"), match (whether the two challenge dice are equal), and d100 (the challenge dice read as an oracle roll, the first as the tens digit). tag::ironsworn",
         InputSchema = new
         {
             type = "object",

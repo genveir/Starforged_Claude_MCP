@@ -21,7 +21,7 @@ public class FindTextTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "find_text",
-        Description = "Finds the documents in a category, and every category under it, whose content contains an exact word or phrase, ignoring case. Use it for names, places, ship names and other terms where exact spelling matters: search_index matches on meaning, and for a rare proper noun such as a surname it tends to return loosely related chunks rather than the ones that mention it. Unlike search_index, this searches every document, indexed or not. Returns the matching files, most matches first, each with its leaf category, its match count and up to 5 short snippets labelled with the section they are in; at most 25 files are listed, and truncated says whether more matched. A snippet's section can be passed to the section tools as it is.",
+        Description = "Finds the documents in a category, and every category under it, whose content contains an exact word or phrase, ignoring case. Use it for names, places, ship names and other terms where exact spelling matters: search_index matches on meaning, and for a rare proper noun such as a surname it tends to return loosely related chunks rather than the ones that mention it. Unlike search_index, this searches every document, indexed or not. Returns the matching files, most matches first, each with its leaf category, its match count and up to 5 short snippets labelled with the section they are in; at most 25 files are listed, and truncated says whether more matched. A snippet's section can be passed to the section tools as it is. tag::core-access",
         InputSchema = new
         {
             type = "object",

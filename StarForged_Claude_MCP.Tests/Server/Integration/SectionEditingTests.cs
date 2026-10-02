@@ -581,7 +581,7 @@ public class SectionEditingTests : McpServerTestBase
         });
 
         ToolPayload(results).GetProperty("results").EnumerateArray()
-            .Should().NotBeEmpty(because: "the new text has to be searchable without a separate index_document call");
+            .Should().NotBeEmpty(because: "the new text has to be searchable without a separate call to turn indexing on");
     }
 
     [Fact]
@@ -597,18 +597,18 @@ public class SectionEditingTests : McpServerTestBase
     }
 
     [Fact]
-    public async Task IndexDocument_AndDeindexDocument_ShouldTurnSearchabilityOnAndOffWithoutTouchingTheContent()
+    public async Task UpdateDocument_WithIndexed_ShouldTurnSearchabilityOnAndOff()
     {
         await ClearTestDocuments();
         await StoreDocument("55", Nested, indexed: false);
 
-        (await CallTool("56", "index_document", Arguments())).ShouldHaveSucceeded();
+        (await CallTool("56", "update_document", UpdateArguments(indexed: true))).ShouldHaveSucceeded();
 
         var indexed = await Db.GetDocument(Category, Filename);
         indexed!.Indexed.Should().BeTrue();
         indexed.Content.Should().Be(Nested);
 
-        (await CallTool("57", "deindex_document", Arguments())).ShouldHaveSucceeded();
+        (await CallTool("57", "update_document", UpdateArguments(indexed: false))).ShouldHaveSucceeded();
 
         var deindexed = await Db.GetDocument(Category, Filename);
         deindexed!.Indexed.Should().BeFalse();
@@ -616,17 +616,21 @@ public class SectionEditingTests : McpServerTestBase
     }
 
     [Fact]
-    public async Task IndexDocument_WhenTheDocumentIsMissing_ShouldReturnError()
+    public async Task UpdateDocument_WithoutIndexed_ShouldLeaveIndexingAsItIs()
     {
         await ClearTestDocuments();
+        await StoreDocument("105", Nested, indexed: true);
 
-        var response = await CallTool("58", "index_document", new Dictionary<string, object>
-        {
-            ["category"] = Category,
-            ["filename"] = "never_stored.md"
-        });
+        (await CallTool("106", "update_document", Arguments(("text", Nested)))).ShouldHaveSucceeded();
 
-        response.ShouldHaveBeenRefused().Should().Contain("No document named");
+        (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
+    }
+
+    private static Dictionary<string, object> UpdateArguments(bool indexed)
+    {
+        var arguments = Arguments(("text", Nested));
+        arguments["indexed"] = indexed;
+        return arguments;
     }
 
     private static string Lines(params string[] lines) => string.Join("\n", lines);

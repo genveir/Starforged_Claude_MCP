@@ -21,7 +21,7 @@ public class ListDocumentsTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "list_documents",
-        Description = "List documents: lists the documents in a leaf category, giving each one's filename, summary and whether it is indexed, without their content. Use it to browse a category, see which documents exist, or find a filename. Use get_document to fetch one in full. Given a parent category, it is refused with a list of the leaf categories under it.",
+        Description = "List documents: lists the documents in a leaf category, giving each one's filename, summary and whether it is indexed, without their content. Use it to browse a category, see which documents exist, or find a filename. Use get_document to fetch one in full. Given a parent category, it is refused with a list of the leaf categories under it. tag::core-access",
         InputSchema = new
         {
             type = "object",

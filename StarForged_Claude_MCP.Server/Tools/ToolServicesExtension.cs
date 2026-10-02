@@ -21,8 +21,6 @@ public static class ToolServicesExtension
         services.AddSingleton<ITool, ReplaceSectionTextTool>();
         services.AddSingleton<ITool, AppendToDocumentTool>();
         services.AddSingleton<ITool, DeleteDocumentSectionTool>();
-        services.AddSingleton<ITool, IndexDocumentTool>();
-        services.AddSingleton<ITool, DeindexDocumentTool>();
         services.AddSingleton<ITool, ArchiveDocumentTool>();
         services.AddSingleton<ITool, GetDocumentTool>();
         services.AddSingleton<ITool, GetDocumentSummaryTool>();

@@ -75,22 +75,6 @@ public class WritePermissionToolTests
             }
         },
         {
-            "index_document",
-            new Dictionary<string, object>
-            {
-                ["category"] = Category,
-                ["filename"] = Filename
-            }
-        },
-        {
-            "deindex_document",
-            new Dictionary<string, object>
-            {
-                ["category"] = Category,
-                ["filename"] = Filename
-            }
-        },
-        {
             "archive_document",
             new Dictionary<string, object>
             {
@@ -248,7 +232,7 @@ public class WritePermissionToolTests
 
         mock.Setup(f => f.AddDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .ReturnsAsync(true);
-        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.ReplaceSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
@@ -257,10 +241,6 @@ public class WritePermissionToolTests
         mock.Setup(f => f.AppendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
-            .ReturnsAsync(true);
-        mock.Setup(f => f.IndexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(true);
-        mock.Setup(f => f.DeindexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);

@@ -21,7 +21,7 @@ public class RequestWritePermissionTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "request_write_permission",
-        Description = "Permits writing in one leaf category: adding, updating, editing sections of, indexing and archiving its documents. Every one of those tools refuses to run until this has been called for the category it is given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits.",
+        Description = "Permits writing in one leaf category: adding, updating, editing sections of, indexing and archiving its documents. Every one of those tools refuses to run until this has been called for the category it is given. The permission covers that category only and lasts until release_write_permission is called for it or the server exits. tag::authorization",
         InputSchema = new
         {
             type = "object",

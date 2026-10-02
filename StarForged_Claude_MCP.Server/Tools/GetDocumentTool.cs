@@ -21,7 +21,7 @@ public class GetDocumentTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "get_document",
-        Description = "Retrieves one document in full by category and filename, as listed by list_documents.",
+        Description = "Retrieves one document in full by category and filename, as listed by list_documents. tag::core-access",
         InputSchema = new
         {
             type = "object",

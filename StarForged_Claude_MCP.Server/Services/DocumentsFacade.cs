@@ -31,8 +31,8 @@ public class DocumentsFacade : IDocumentsFacade
         return true;
     }
 
-    public async Task<bool> UpdateDocumentAsync(string category, string filename, string content, string? summary) =>
-        await WriteAsync(category, filename, summary, rewrite: _ => content);
+    public async Task<bool> UpdateDocumentAsync(string category, string filename, string content, string? summary, bool? indexed) =>
+        await WriteAsync(category, filename, summary, rewrite: _ => content, indexed);
 
     public async Task<bool> ReplaceSectionAsync(string category, string filename, string section, string text, string? summary) =>
         await WriteAsync(category, filename, summary,
@@ -49,24 +49,6 @@ public class DocumentsFacade : IDocumentsFacade
     public async Task<bool> DeleteSectionAsync(string category, string filename, string section, string? summary) =>
         await WriteAsync(category, filename, summary,
             rewrite: existing => MarkdownSectionEditor.DeleteSection(existing.Content, section));
-
-    public async Task<bool> IndexDocumentAsync(string category, string filename)
-    {
-        var existing = await _dbInterface.GetDocument(category, filename);
-        if (existing == null) return false;
-
-        await _documentProcessing.IndexDocumentAsync(existing.Content, existing.Id, DocumentProcessorToUse.Markdown);
-        return true;
-    }
-
-    public async Task<bool> DeindexDocumentAsync(string category, string filename)
-    {
-        var existing = await _dbInterface.GetDocument(category, filename);
-        if (existing == null) return false;
-
-        await _documentProcessing.RemoveIndexForDocumentAsync(existing.Id);
-        return true;
-    }
 
     public async Task<bool> DeleteDocumentAsync(string category, string filename)
     {
@@ -103,9 +85,10 @@ public class DocumentsFacade : IDocumentsFacade
     /// <summary>
     /// The one path every content write takes: rewrite the content, keep the summary unless this
     /// write carries one of its own, and rebuild the index only for a document that already had one.
-    /// Whether a document is indexed is <see cref="IndexDocumentAsync"/>'s business, not an edit's.
+    /// Whether a document is indexed is left alone unless indexed is given, which only a full
+    /// <see cref="UpdateDocumentAsync"/> does; a section edit is not a decision about indexing.
     /// </summary>
-    private async Task<bool> WriteAsync(string category, string filename, string? summary, Func<Document, string> rewrite)
+    private async Task<bool> WriteAsync(string category, string filename, string? summary, Func<Document, string> rewrite, bool? indexed = null)
     {
         var existing = await _dbInterface.GetDocument(category, filename);
         if (existing == null) return false;
@@ -114,9 +97,13 @@ public class DocumentsFacade : IDocumentsFacade
 
         await _dbInterface.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
 
-        if (existing.Indexed)
+        if (indexed ?? existing.Indexed)
         {
             await _documentProcessing.IndexDocumentAsync(content, existing.Id, DocumentProcessorToUse.Markdown);
+        }
+        else if (existing.Indexed)
+        {
+            await _documentProcessing.RemoveIndexForDocumentAsync(existing.Id);
         }
 
         return true;

@@ -21,7 +21,7 @@ public class GetDocumentSummaryTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "get_document_summary",
-        Description = "Retrieves one document's summary without its content. Useful after search_index, where several chunks of one file can be returned at once: fetch the file's summary once to see what it is, rather than judging it from each chunk. The summary is null for documents stored without one.",
+        Description = "Retrieves one document's summary without its content. Useful after search_index, where several chunks of one file can be returned at once: fetch the file's summary once to see what it is, rather than judging it from each chunk. The summary is null for documents stored without one. tag::semantic-search",
         InputSchema = new
         {
             type = "object",

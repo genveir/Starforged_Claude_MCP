@@ -25,7 +25,7 @@ public class ArchiveDocumentTool : ITool
         // will readily archive it, so the honest name got the call refused for data its owner means
         // to remove. Deleting stays behind the write permission and the client's own approval prompt.
         Name = "archive_document",
-        Description = "Archives a document: it is hidden from indexing, so it no longer appears in search_index results or list_documents. Requires that request_write_permission has been called for the category.",
+        Description = "Archives a document: it is hidden from indexing, so it no longer appears in search_index results or list_documents. Requires that request_write_permission has been called for the category. tag::document-lifecycle",
         InputSchema = new
         {
             type = "object",

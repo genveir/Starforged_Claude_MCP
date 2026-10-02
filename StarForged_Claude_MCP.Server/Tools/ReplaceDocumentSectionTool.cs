@@ -21,7 +21,7 @@ public class ReplaceDocumentSectionTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "replace_document_section",
-        Description = "Replaces one section of a document and leaves the rest of the file untouched, so only the new text of that section has to be written out. A section runs to the next header at the same or a higher level, which means it carries every subsection nested under it: replacing a '#' section also replaces the '##' and '###' sections beneath it. Target the smallest section that covers the change. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+        Description = "Replaces one section of a document and leaves the rest of the file untouched, so only the new text of that section has to be written out. A section runs to the next header at the same or a higher level, which means it carries every subsection nested under it: replacing a '#' section also replaces the '##' and '###' sections beneath it. Target the smallest section that covers the change. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category. tag::section-editing",
         InputSchema = new
         {
             type = "object",

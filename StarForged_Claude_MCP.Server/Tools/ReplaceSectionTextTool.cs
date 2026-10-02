@@ -21,7 +21,7 @@ public class ReplaceSectionTextTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "replace_section_text",
-        Description = "Replaces every occurrence of a literal snippet of text within one section, leaving the rest of the section and the rest of the document untouched. Prefer this over replace_document_section for a small change, since only the changed snippet has to be written out rather than the whole section. Reports how many occurrences were replaced. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category.",
+        Description = "Replaces every occurrence of a literal snippet of text within one section, leaving the rest of the section and the rest of the document untouched. Prefer this over replace_document_section for a small change, since only the changed snippet has to be written out rather than the whole section. Reports how many occurrences were replaced. An indexed document is re-indexed from the result. Requires that request_write_permission has been called for the category. tag::section-editing",
         InputSchema = new
         {
             type = "object",

@@ -19,7 +19,7 @@ public class ReleaseWritePermissionTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "release_write_permission",
-        Description = "Revokes the write permission granted by request_write_permission, returning one category to read-only. Succeeds whether or not writes were permitted in it.",
+        Description = "Revokes the write permission granted by request_write_permission, returning one category to read-only. Succeeds whether or not writes were permitted in it. tag::authorization",
         InputSchema = new
         {
             type = "object",

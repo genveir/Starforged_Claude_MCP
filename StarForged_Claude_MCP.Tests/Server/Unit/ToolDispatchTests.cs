@@ -72,10 +72,11 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename,
                 ["text"] = Text,
-                ["summary"] = Summary
+                ["summary"] = Summary,
+                ["indexed"] = false
             },
             VerifyDispatch: (embeddings, documents, permissions) =>
-                documents.Verify(f => f.UpdateDocumentAsync(Category, Filename, Text, Summary), Times.Once)),
+                documents.Verify(f => f.UpdateDocumentAsync(Category, Filename, Text, Summary, false), Times.Once)),
 
         ["replace_document_section"] = new ToolCase(
             Arguments: new Dictionary<string, object>
@@ -122,24 +123,6 @@ public class ToolDispatchTests
             },
             VerifyDispatch: (embeddings, documents, permissions) =>
                 documents.Verify(f => f.DeleteSectionAsync(Category, Filename, Section, null), Times.Once)),
-
-        ["index_document"] = new ToolCase(
-            Arguments: new Dictionary<string, object>
-            {
-                ["category"] = Category,
-                ["filename"] = Filename
-            },
-            VerifyDispatch: (embeddings, documents, permissions) =>
-                documents.Verify(f => f.IndexDocumentAsync(Category, Filename), Times.Once)),
-
-        ["deindex_document"] = new ToolCase(
-            Arguments: new Dictionary<string, object>
-            {
-                ["category"] = Category,
-                ["filename"] = Filename
-            },
-            VerifyDispatch: (embeddings, documents, permissions) =>
-                documents.Verify(f => f.DeindexDocumentAsync(Category, Filename), Times.Once)),
 
         ["archive_document"] = new ToolCase(
             Arguments: new Dictionary<string, object>
@@ -310,7 +293,7 @@ public class ToolDispatchTests
 
         mock.Setup(f => f.AddDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool>()))
             .ReturnsAsync(true);
-        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
+        mock.Setup(f => f.UpdateDocumentAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<bool?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.ReplaceSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
@@ -319,10 +302,6 @@ public class ToolDispatchTests
         mock.Setup(f => f.AppendAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<string>(), It.IsAny<string?>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteSectionAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>()))
-            .ReturnsAsync(true);
-        mock.Setup(f => f.IndexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
-            .ReturnsAsync(true);
-        mock.Setup(f => f.DeindexDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);
         mock.Setup(f => f.DeleteDocumentAsync(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(true);

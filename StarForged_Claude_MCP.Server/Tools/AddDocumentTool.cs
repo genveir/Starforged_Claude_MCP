@@ -21,7 +21,7 @@ public class AddDocumentTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "add_document",
-        Description = "Stores a new document under a filename within a leaf category. A category holds either documents or subcategories, never both, so a new category cannot be created under one that already holds documents. Fails if that category already holds a document with the same filename; use update_document to replace one. Requires that request_write_permission has been called for the category.",
+        Description = "Stores a new document under a filename within a leaf category. A category holds either documents or subcategories, never both, so a new category cannot be created under one that already holds documents. Fails if that category already holds a document with the same filename; use update_document to replace one. Requires that request_write_permission has been called for the category. tag::document-lifecycle",
         InputSchema = new
         {
             type = "object",
@@ -31,7 +31,7 @@ public class AddDocumentTool : ITool
                 filename = new { type = "string", description = "Filename, unique within the category (e.g., 'session_5.md')" },
                 text = new { type = "string", description = "The full content of the document. " + ToolDescriptions.MarkdownStructure },
                 summary = new { type = "string", description = "Optional short summary, shown alongside the filename whenever the category's documents are listed" },
-                indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it. Use index_document or deindex_document to change this later." }
+                indexed = new { type = "boolean", description = "Whether to chunk and embed this document so search_index can find it. Use update_document's indexed to change this later." }
             },
             required = new[] { "category", "filename", "text", "indexed" }
         }

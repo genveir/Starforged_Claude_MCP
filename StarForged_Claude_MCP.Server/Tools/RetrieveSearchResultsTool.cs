@@ -19,7 +19,7 @@ public class RetrieveSearchResultsTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "retrieve_search_results",
-        Description = "Retrieves full chunk text by ID. Results are returned in the exact same order as the provided IDs. IDs not found in the database are omitted. Use this after search_index to fetch full content for relevant IDs.",
+        Description = "Retrieves full chunk text by ID. Results are returned in the exact same order as the provided IDs. IDs not found in the database are omitted. Use this after search_index to fetch full content for relevant IDs. tag::semantic-search",
         InputSchema = new
         {
             type = "object",

@@ -137,6 +137,17 @@ public class ToolArguments
     }
 
     /// <summary>
+    /// For a flag whose absence means something of its own, such as leaving a setting as it is.
+    /// </summary>
+    public bool? OptionalBool(string key)
+    {
+        if (IsAbsent(key, out _))
+            return null;
+
+        return RequireBool(key);
+    }
+
+    /// <summary>
     /// Argument problems are told to the caller in the same terms as any other refusal, rather than
     /// surfacing as an unhandled conversion failure: a caller that sent "3" for a number learns that
     /// much and can send 3, where a generic failure leaves it nothing to go on.

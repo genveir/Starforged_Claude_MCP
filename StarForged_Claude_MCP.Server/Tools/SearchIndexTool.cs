@@ -19,7 +19,7 @@ public class SearchIndexTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "search_index",
-        Description = "Search for relevant chunks by semantic similarity within a category and every category under it. Only documents stored with indexed=true are searchable. Returns IDs, scores, the leaf category and filename each chunk came from, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs, or get_document to fetch the whole file a chunk came from. To find where an exact name or term appears, use find_text instead.",
+        Description = "Search for relevant chunks by semantic similarity within a category and every category under it. Only documents stored with indexed=true are searchable. Returns IDs, scores, the leaf category and filename each chunk came from, and brief summaries only — not full content. Use retrieve_search_results to fetch full text for relevant IDs, or get_document to fetch the whole file a chunk came from. To find where an exact name or term appears, use find_text instead. tag::semantic-search",
         InputSchema = new
         {
             type = "object",
