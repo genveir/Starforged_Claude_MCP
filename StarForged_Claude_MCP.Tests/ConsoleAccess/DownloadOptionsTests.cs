@@ -1,4 +1,5 @@
 using FluentAssertions;
+using StarForged_Claude_MCP.ConsoleAccess;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 
 namespace StarForged_Claude_MCP.Tests.ConsoleAccess;
@@ -50,6 +51,14 @@ public class DownloadOptionsTests
     }
 
     [Theory]
+    [InlineData("--verbosity", "changed", Verbosity.Changed)]
+    [InlineData("-v", "ALL", Verbosity.All)]
+    public void Parse_Verbosity_ShouldTakeTheModeFromTheFlag(string flag, string mode, Verbosity expected)
+    {
+        DownloadOptions.Parse(["lore", @".\out", "--folder", flag, mode])!.Verbosity.Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData("lore", "--folder")]
     [InlineData("lore", "ship.md", "--document", "ship.md", "--clean")]
     [InlineData("log", "s3.md", "--beats", "3", "-c")]
@@ -57,6 +66,8 @@ public class DownloadOptionsTests
     [InlineData("lore", "s3.md", "--beats", "three")]
     [InlineData("lore", "ship.md", "--document")]
     [InlineData("lore", @".\out", "--folder", "--index")]
+    [InlineData("lore", @".\out", "--folder", "--verbosity")]
+    [InlineData("lore", @".\out", "--folder", "-v", "some")]
     public void Parse_WithMissingOrInvalidArguments_ShouldReturnNull(params string[] args)
     {
         DownloadOptions.Parse(args).Should().BeNull();

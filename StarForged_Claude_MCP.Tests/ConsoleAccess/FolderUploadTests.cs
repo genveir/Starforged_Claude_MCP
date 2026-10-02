@@ -1,5 +1,6 @@
 using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
+using StarForged_Claude_MCP.ConsoleAccess;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
@@ -217,10 +218,52 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         folder.Write("forge.md", Markdown("Forge", "The blacksmith quenched the glowing iron."));
         var output = await UploadCapturingOutput(folder, SummaryMode.None, index: IndexMode.All);
 
-        output.Should().Contain("Unchanged.");
+        output.Should().Contain($"reef.md -> {Category} (unchanged)");
         output.Should().Contain("0 document(s) stored, 1 replaced, 1 unchanged.");
         (await Search("coral reef tropical fish")).Should().Contain(result => result.Text.Contains("coral reef"),
             because: "an unchanged document keeps its index");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WithVerbosityChanged_ShouldOnlyReportTheTotalsOfLeavesWithChangesAndTheOutermostCategory()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write(Path.Combine("Oracles", "moves.md"), Markdown("Moves", "The moves."));
+        await Upload(folder, SummaryMode.None);
+
+        folder.Write(Path.Combine("Npcs", "kira.md"), Markdown("Kira", "An ally."));
+        var output = await CapturingOutput(() => Run(new UploadOptions(
+            Category, UploadMode.Folder, SourcePath: folder.Path, Summaries: SummaryMode.None, Index: IndexMode.Drop,
+            Verbosity: Verbosity.Changed)));
+
+        output.Should().NotContain("Found", because: "the file count is only reported with verbosity all");
+        output.Should().NotContain($"'{Category}.Oracles'", because: "nothing in it changed");
+        output.Should().Contain($"Completed '{Category}.Npcs'!");
+        output.Should().Contain($"Uploaded to 2 categories under '{Category}': 1 stored, 0 replaced, 1 unchanged.");
+    }
+
+    [Fact]
+    public async Task UploadFolder_WithVerbosityChanged_ShouldCountUnchangedDocumentsWithoutReportingThem()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        folder.Write("reef.md", Markdown("Reef", "The coral reef teems with colourful tropical fish."));
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith hammered the glowing iron."));
+        await Upload(folder, SummaryMode.None);
+
+        folder.Write("forge.md", Markdown("Forge", "The blacksmith quenched the glowing iron."));
+        folder.Write("tundra.md", Markdown("Tundra", "Frozen plains stretch to the horizon."));
+        var output = await CapturingOutput(() => Run(new UploadOptions(
+            Category, UploadMode.Folder, SourcePath: folder.Path, Summaries: SummaryMode.None, Index: IndexMode.Drop,
+            Verbosity: Verbosity.Changed)));
+
+        output.Should().NotContain("reef.md");
+        output.Should().Contain($"forge.md -> {Category} (replaced: content changed)");
+        output.Should().Contain($"tundra.md -> {Category} (stored)");
+        output.Should().Contain("1 document(s) stored, 1 replaced, 1 unchanged.");
     }
 
     [Fact]
@@ -234,7 +277,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         var output = await UploadCapturingOutput(folder, SummaryMode.All, answers: new() { ["notes.md"] = "A new summary" });
 
-        output.Should().Contain("Replaced: summary changed.");
+        output.Should().Contain($"notes.md -> {Category} (replaced: summary changed)");
         output.Should().Contain("1 replaced, 0 unchanged.");
         (await Db.GetDocument(Category, "notes.md"))!.Summary.Should().Be("A new summary");
     }
@@ -250,7 +293,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
 
         var output = await UploadCapturingOutput(folder, SummaryMode.None, index: IndexMode.All);
 
-        output.Should().Contain("Replaced: indexed.");
+        output.Should().Contain($"reef.md -> {Category} (replaced: indexed)");
         (await Search("coral reef tropical fish")).Should().NotBeEmpty();
     }
 
@@ -402,7 +445,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         prompts.Index.Asked.Should().BeEmpty();
 
         output.Should().Contain("Would ask for a summary and whether to index; taken as answered blank.");
-        output.Should().Contain("Would replace: content changed.");
+        output.Should().Contain($"changed.md -> {Category} (would be replaced: content changed)");
         output.Should().Contain("1 document(s) would be stored, 1 replaced, 1 unchanged.");
         output.Should().Contain("2 question(s) were not asked",
             because: "only the new file lacks a summary and has never been asked about indexing");
@@ -424,7 +467,7 @@ public class FolderUploadTests(TestFixture fixture) : McpServerTestBase(fixture)
         var output = await CapturingOutput(() => Run(new UploadOptions(
             Category, UploadMode.Folder, SourcePath: folder.Path, Index: IndexMode.Drop, Summaries: SummaryMode.None, DryRun: true)));
 
-        output.Should().Contain("Would replace: content changed, removed from index.");
+        output.Should().Contain($"reef.md -> {Category} (would be replaced: content changed, removed from index)");
 
         var results = await Search("coral reef tropical fish");
         results.Should().ContainSingle().Which.Text.Should().Contain("coral reef",

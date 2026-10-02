@@ -1,4 +1,5 @@
 using FluentAssertions;
+using StarForged_Claude_MCP.ConsoleAccess;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.Tests.Server.Integration;
 
@@ -112,6 +113,45 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         output.Should().Contain("0 new, 0 overwritten, 1 unchanged.");
         output.Should().Contain("Skipped 1 existing file(s) that differ from the stored version");
         File.ReadAllText(Path.Combine(folder.Path, "two.md")).Should().Be("Local content.");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithVerbosityChanged_ShouldOnlyReportTheTotalsOfLeavesWithChangesAndTheOutermostCategory()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Db.StoreDocument($"{Category}.Npcs", "kira.md", "Kira.", summary: null);
+        folder.Write(Path.Combine("Oracles", "moves.md"), "The moves.");
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Verbosity: Verbosity.Changed));
+
+        output.Should().NotContain($"category '{Category}.Oracles'", because: "nothing in it changed");
+        output.Should().Contain($"from category '{Category}.Npcs'");
+        output.Should().Contain($"from 2 categories under '{Category}'").And.Contain("1 new, 0 overwritten, 1 unchanged.");
+    }
+
+    [Fact]
+    public async Task DownloadFolder_WithVerbosityChanged_ShouldCountUnchangedFilesWithoutListingThem()
+    {
+        await ClearTestDocuments();
+        using var folder = new TempFolder();
+
+        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Db.StoreDocument(Category, "three.md", "Third content.", summary: null);
+        folder.Write("one.md", "Stored content.");
+        folder.Write("two.md", "Local content.");
+
+        var output = await DownloadCapturingOutput(
+            new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true, Verbosity: Verbosity.Changed));
+
+        output.Should().NotContain("one.md");
+        output.Should().Contain($"{Path.Combine(folder.Path, "two.md")} (overwritten)");
+        output.Should().Contain($"{Path.Combine(folder.Path, "three.md")} (new)");
+        output.Should().Contain("1 new, 1 overwritten, 1 unchanged.");
     }
 
     [Fact]

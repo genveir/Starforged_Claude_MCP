@@ -39,7 +39,8 @@ public record UploadOptions(
     int SessionNumber = 0,
     IndexMode Index = IndexMode.New,
     SummaryMode Summaries = SummaryMode.Missing,
-    bool DryRun = false) : IConsoleAccessOptions
+    bool DryRun = false,
+    Verbosity Verbosity = Verbosity.All) : IConsoleAccessOptions
 {
     public static UploadOptions? Parse(string[] args)
     {
@@ -57,6 +58,8 @@ public record UploadOptions(
         var summaries = SummaryMode.Missing;
         var summariesGiven = false;
         var dryRun = false;
+        var verbosity = Verbosity.All;
+        var verbosityGiven = false;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -108,6 +111,16 @@ public record UploadOptions(
                 case "-n":
                     dryRun = true;
                     break;
+                case "--verbosity":
+                case "-v":
+                    if (i + 1 >= rest.Length || !Enum.TryParse(rest[++i], ignoreCase: true, out verbosity))
+                    {
+                        Console.Error.WriteLine("Error: --verbosity takes one of: all, changed.");
+                        PrintUsage();
+                        return null;
+                    }
+                    verbosityGiven = true;
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
@@ -142,7 +155,14 @@ public record UploadOptions(
             return null;
         }
 
-        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, index, summaries, dryRun);
+        if (mode == UploadMode.Beats && verbosityGiven)
+        {
+            Console.Error.WriteLine("Error: beats report every one stored, so --verbosity cannot be used with --beats.");
+            PrintUsage();
+            return null;
+        }
+
+        return new UploadOptions(category, mode.Value, sourcePath, sessionNumber, index, summaries, dryRun, verbosity);
     }
 
     public static void PrintUsage()
@@ -173,5 +193,9 @@ public record UploadOptions(
         Console.WriteLine("  -n, --dry-run           Report what a folder or document upload would store, replace and");
         Console.WriteLine("                          index without writing anything; nothing is asked, and every");
         Console.WriteLine("                          question is taken as answered blank");
+        Console.WriteLine("  -v, --verbosity <mode>  Which files a folder or document upload reports on (default: all)");
+        Console.WriteLine("                            all      Every file, including those left unchanged");
+        Console.WriteLine("                            changed  Only files that are stored or replaced, and the");
+        Console.WriteLine("                                     totals of categories with changes and of the whole upload");
     }
 }

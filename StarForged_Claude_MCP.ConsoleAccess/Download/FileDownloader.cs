@@ -27,7 +27,8 @@ public class FileDownloader
         switch (options.Mode)
         {
             case DownloadMode.Folder:
-                await DownloadFolderAsync(options.Category, options.TargetPath, options.Overwrite, options.Clean, options.DryRun);
+                await DownloadFolderAsync(
+                    options.Category, options.TargetPath, options.Overwrite, options.Clean, options.DryRun, options.Verbosity);
                 break;
             case DownloadMode.Document:
                 await DownloadDocumentAsync(options.Category, options.Filename!, options.TargetPath, options.Overwrite, options.DryRun);
@@ -45,9 +46,11 @@ public class FileDownloader
     /// category every leaf gets its own folder, nested to mirror the category tree: leaf 'Campaign.Npcs.Allies'
     /// under 'Campaign' goes to 'Npcs/Allies'. With <paramref name="clean"/>, the .md files in the folder that are
     /// not part of the download are deleted afterwards, once the user has confirmed the list of them. With
-    /// <paramref name="dryRun"/> nothing is written or deleted, and the list is shown without asking.
+    /// <paramref name="dryRun"/> nothing is written or deleted, and the list is shown without asking. With
+    /// <see cref="Verbosity.Changed"/> the files left unchanged are counted but not listed.
     /// </summary>
-    private async Task DownloadFolderAsync(string category, string folderPath, bool overwrite, bool clean, bool dryRun)
+    private async Task DownloadFolderAsync(
+        string category, string folderPath, bool overwrite, bool clean, bool dryRun, Verbosity verbosity)
     {
         var leaves = await PlanFolderAsync(category, folderPath);
         if (leaves.Count == 0)
@@ -61,7 +64,7 @@ public class FileDownloader
 
         if (leaves is [var only] && only.Category == category)
         {
-            var tally = await DownloadLeafAsync(only, overwrite, dryRun);
+            var tally = await DownloadLeafAsync(only, overwrite, dryRun, verbosity, isOutermost: true);
             ReportSkipped(tally.Skipped, dryRun);
         }
         else
@@ -69,7 +72,7 @@ public class FileDownloader
             var total = new DownloadTally();
             foreach (var leaf in leaves)
             {
-                total += await DownloadLeafAsync(leaf, overwrite, dryRun);
+                total += await DownloadLeafAsync(leaf, overwrite, dryRun, verbosity, isOutermost: false);
             }
 
             Console.WriteLine(
@@ -259,7 +262,12 @@ public class FileDownloader
         .Distinct(StringComparer.OrdinalIgnoreCase)
         .OrderByDescending(folder => folder.Length);
 
-    private async Task<DownloadTally> DownloadLeafAsync(LeafDownload leaf, bool overwrite, bool dryRun)
+    /// <summary>
+    /// Downloads the documents of one leaf category. With <see cref="Verbosity.Changed"/> its totals are reported
+    /// only when a file was written or skipped, unless it is the outermost category of the download.
+    /// </summary>
+    private async Task<DownloadTally> DownloadLeafAsync(
+        LeafDownload leaf, bool overwrite, bool dryRun, Verbosity verbosity, bool isOutermost)
     {
         var tally = new DownloadTally();
 
@@ -279,7 +287,11 @@ public class FileDownloader
             }
 
             if (!dryRun) await WriteAsync(path, document.Content, existing);
-            Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(existing, dryRun)}");
+            if (existing != ExistingFile.Identical || verbosity == Verbosity.All)
+            {
+                Console.WriteLine($"{entry.Filename} -> {path} {DescribeWrite(existing, dryRun)}");
+            }
+
             tally = existing switch
             {
                 ExistingFile.Missing => tally with { Created = tally.Created + 1 },
@@ -288,9 +300,13 @@ public class FileDownloader
             };
         }
 
-        Console.WriteLine(
-            $"{(dryRun ? "Would download" : "Downloaded")} {tally.Written} document(s) from category '{leaf.Category}' to {leaf.Folder}: " +
-            $"{tally.Created} new, {tally.Overwritten} overwritten, {tally.Unchanged} unchanged.");
+        if (verbosity == Verbosity.All || isOutermost || tally.Written + tally.Skipped > 0)
+        {
+            Console.WriteLine(
+                $"{(dryRun ? "Would download" : "Downloaded")} {tally.Written} document(s) from category '{leaf.Category}' to {leaf.Folder}: " +
+                $"{tally.Created} new, {tally.Overwritten} overwritten, {tally.Unchanged} unchanged.");
+        }
+
         return tally;
     }
 

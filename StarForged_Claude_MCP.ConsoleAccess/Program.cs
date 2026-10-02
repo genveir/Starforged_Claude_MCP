@@ -23,7 +23,7 @@ public class Program
 
         var builder = Host.CreateApplicationBuilder(args);
 
-        builder.Configuration.AddJsonFile("appsettings.json", optional: false);
+        builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "appsettings.json"), optional: false);
 
         ConfigureServices(builder.Services);
 
@@ -116,10 +116,10 @@ public class Program
     internal static void PrintUsage()
     {
         Console.WriteLine("Usage:");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>] [--dry-run]");
-        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>] [--dry-run]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --folder <path> [--index <mode>] [--summaries <mode>] [--dry-run] [--verbosity <mode>]");
+        Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --document <path> [--index <mode>] [--summaries <mode>] [--dry-run] [--verbosity <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe upload <category> --beats <sessionNumber>");
-        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean] [--dry-run]");
+        Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --folder [--overwrite] [--clean] [--dry-run] [--verbosity <mode>]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --document <filename> [--overwrite] [--dry-run]");
         Console.WriteLine("  .\\ConsoleAccess.exe download <category> <path> --beats <sessionNumber> [--overwrite] [--dry-run]");
         Console.WriteLine("  .\\ConsoleAccess.exe cat <category> <filename>");

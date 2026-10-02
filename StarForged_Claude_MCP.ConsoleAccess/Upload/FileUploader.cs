@@ -50,11 +50,14 @@ public class FileUploader
         switch (options.Mode)
         {
             case UploadMode.Folder:
-                await UploadFolderAsync(options.Category, options.SourcePath!, options.Index, options.Summaries, options.DryRun);
+                await UploadFolderAsync(
+                    options.Category, options.SourcePath!, options.Index, options.Summaries, options.DryRun, options.Verbosity);
                 break;
             case UploadMode.Document:
                 if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
-                await UploadFilesAsync(options.Category, [options.SourcePath!], options.Index, options.Summaries, options.DryRun);
+                await UploadFilesAsync(
+                    options.Category, [options.SourcePath!], options.Index, options.Summaries, options.DryRun, options.Verbosity,
+                    isOutermost: true);
                 break;
             case UploadMode.Beats:
                 if (!await CategoryHierarchy.RequireLeaf(dbInterface, options.Category)) return;
@@ -70,7 +73,8 @@ public class FileUploader
     /// becomes a subcategory, at any depth, so 'Oracles/moves.md' is stored in '{category}.Oracles'. The whole
     /// folder is checked before anything is written, so a folder that breaks the category hierarchy stores nothing.
     /// </summary>
-    private async Task UploadFolderAsync(string category, string folderPath, IndexMode index, SummaryMode summaries, bool dryRun)
+    private async Task UploadFolderAsync(
+        string category, string folderPath, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity)
     {
         var leaves = new List<LeafUpload>();
         if (!TryPlanFolder(category, folderPath, leaves)) return;
@@ -88,14 +92,14 @@ public class FileUploader
 
         if (leaves is [var only] && only.Category == category)
         {
-            await UploadFilesAsync(category, only.Files, index, summaries, dryRun);
+            await UploadFilesAsync(category, only.Files, index, summaries, dryRun, verbosity, isOutermost: true);
             return;
         }
 
         var total = new UploadTally();
         foreach (var leaf in leaves)
         {
-            total += await UploadFilesAsync(leaf.Category, leaf.Files, index, summaries, dryRun);
+            total += await UploadFilesAsync(leaf.Category, leaf.Files, index, summaries, dryRun, verbosity, isOutermost: false);
         }
 
         Console.WriteLine(
@@ -151,11 +155,18 @@ public class FileUploader
     /// <summary>
     /// Stores <paramref name="files"/> under <paramref name="category"/>. With <paramref name="dryRun"/> nothing is
     /// written and nothing is asked: every question is taken as answered blank, and the report says what would change.
+    /// Each file is reported once it has been handled, so any question about it comes before its line; with
+    /// <see cref="Verbosity.Changed"/> the files left unchanged are counted but not reported, and the category's
+    /// totals are reported only when something was stored or replaced, unless it is the outermost category of the upload.
     /// </summary>
     private async Task<UploadTally> UploadFilesAsync(
-        string category, string[] files, IndexMode index, SummaryMode summaries, bool dryRun)
+        string category, string[] files, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity,
+        bool isOutermost)
     {
-        Console.WriteLine($"Found {files.Length} file(s) to process for '{category}'.");
+        if (verbosity == Verbosity.All)
+        {
+            Console.WriteLine($"Found {files.Length} file(s) to process for '{category}'.");
+        }
 
         var stored = 0;
         var replaced = 0;
@@ -164,8 +175,6 @@ public class FileUploader
 
         foreach (var filePath in files)
         {
-            Console.WriteLine($"Processing: {filePath}");
-
             var text = await File.ReadAllTextAsync(filePath);
             var filename = Path.GetFileName(filePath);
 
@@ -177,22 +186,19 @@ public class FileUploader
             var summary = ResolveSummary(filename, existing?.Summary, summaries, dryRun ? skipped : summaryPrompt);
             var indexed = ResolveIndexed(filename, existing?.Indexed, index, dryRun ? skipped : indexPrompt);
 
-            if (skipped.Questions.Count > 0)
-            {
-                Console.WriteLine($"  Would ask for {string.Join(" and ", skipped.Questions)}; taken as answered blank.");
-                skippedQuestions += skipped.Questions.Count;
-            }
+            skippedQuestions += skipped.Questions.Count;
 
+            string outcome;
             if (existing == null)
             {
                 if (!dryRun) await StoreDocumentAsync(category, filename, text, summary, indexed);
-                Console.WriteLine((dryRun, indexed) switch
+                outcome = (dryRun, indexed) switch
                 {
-                    (true, true) => "  Would store and index.",
-                    (true, false) => "  Would store.",
-                    (false, true) => "  Stored and indexed.",
-                    (false, false) => "  Stored."
-                });
+                    (true, true) => "would be stored and indexed",
+                    (true, false) => "would be stored",
+                    (false, true) => "stored and indexed",
+                    (false, false) => "stored"
+                };
                 stored++;
             }
             else
@@ -200,21 +206,33 @@ public class FileUploader
                 var changes = await ReplaceDocumentAsync(existing, text, summary, indexed, dryRun);
                 if (changes.Count == 0)
                 {
-                    Console.WriteLine("  Unchanged.");
                     unchanged++;
+                    if (verbosity == Verbosity.Changed) continue;
+
+                    outcome = "unchanged";
                 }
                 else
                 {
-                    Console.WriteLine($"  {(dryRun ? "Would replace" : "Replaced")}: {string.Join(", ", changes)}.");
+                    outcome = $"{(dryRun ? "would be replaced" : "replaced")}: {string.Join(", ", changes)}";
                     replaced++;
                 }
             }
+
+            Console.WriteLine($"{filename} -> {category} ({outcome})");
+            if (skipped.Questions.Count > 0)
+            {
+                Console.WriteLine($"  Would ask for {string.Join(" and ", skipped.Questions)}; taken as answered blank.");
+            }
         }
 
-        Console.WriteLine(dryRun
-            ? $"\nDry run of '{category}': {stored} document(s) would be stored, {replaced} replaced, {unchanged} unchanged."
-            : $"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced, {unchanged} unchanged.");
-        ReportSkippedQuestions(skippedQuestions);
+        if (verbosity == Verbosity.All || isOutermost || stored + replaced > 0)
+        {
+            Console.WriteLine(dryRun
+                ? $"\nDry run of '{category}': {stored} document(s) would be stored, {replaced} replaced, {unchanged} unchanged."
+                : $"\nCompleted '{category}'! {stored} document(s) stored, {replaced} replaced, {unchanged} unchanged.");
+            ReportSkippedQuestions(skippedQuestions);
+        }
+
         return new UploadTally(stored, replaced, unchanged, skippedQuestions);
     }
 

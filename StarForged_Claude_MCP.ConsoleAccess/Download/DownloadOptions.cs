@@ -10,7 +10,8 @@ public record DownloadOptions(
     int SessionNumber = 0,
     bool Overwrite = false,
     bool Clean = false,
-    bool DryRun = false) : IConsoleAccessOptions
+    bool DryRun = false,
+    Verbosity Verbosity = Verbosity.All) : IConsoleAccessOptions
 {
     public static DownloadOptions? Parse(string[] args)
     {
@@ -36,6 +37,7 @@ public record DownloadOptions(
         bool overwrite = false;
         bool clean = false;
         bool dryRun = false;
+        var verbosity = Verbosity.All;
 
         for (int i = 0; i < rest.Length; i++)
         {
@@ -73,6 +75,15 @@ public record DownloadOptions(
                 case "-n":
                     dryRun = true;
                     break;
+                case "--verbosity":
+                case "-v":
+                    if (i + 1 >= rest.Length || !Enum.TryParse(rest[++i], ignoreCase: true, out verbosity))
+                    {
+                        Console.Error.WriteLine("Error: --verbosity takes one of: all, changed.");
+                        PrintUsage();
+                        return null;
+                    }
+                    break;
                 default:
                     Console.Error.WriteLine($"Unknown argument: {rest[i]}");
                     PrintUsage();
@@ -93,7 +104,7 @@ public record DownloadOptions(
             return null;
         }
 
-        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean, dryRun);
+        return new DownloadOptions(category, targetPath, mode.Value, filename, sessionNumber, overwrite, clean, dryRun, verbosity);
     }
 
     public static void PrintUsage()
@@ -114,5 +125,9 @@ public record DownloadOptions(
         Console.WriteLine("                          period are left alone");
         Console.WriteLine("  -n, --dry-run           Report what would be written, overwritten, skipped and deleted");
         Console.WriteLine("                          without touching any file; --clean lists its files without asking");
+        Console.WriteLine("  -v, --verbosity <mode>  Which files a --folder download reports on (default: all)");
+        Console.WriteLine("                            all      Every file, including those left unchanged");
+        Console.WriteLine("                            changed  Only files that are new or overwritten, and the");
+        Console.WriteLine("                                     totals of categories with changes and of the whole download");
     }
 }
