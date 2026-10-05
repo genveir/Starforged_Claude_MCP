@@ -25,6 +25,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<Content Include="..\skill\**\*.*"
+				 Link="skill\%(RecursiveDir)%(Filename)%(Extension)"
+				 CopyToOutputDirectory="PreserveNewest" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<InternalsVisibleTo Include="StarForged_Claude_MCP.Tests" />
 	</ItemGroup>
 
