@@ -260,7 +260,7 @@ public class DocumentCrudTests : McpServerTestBase
     {
         await ClearTestDocuments();
 
-        await Db.StoreDocument(Category, "from_the_console.md", "Some content.", summary: null);
+        await Documents.StoreDocument(Category, "from_the_console.md", "Some content.", summary: null);
 
         var response = await CallTool("24", "get_document_summary", new Dictionary<string, object>
         {
@@ -303,14 +303,14 @@ public class DocumentCrudTests : McpServerTestBase
             ["indexed"] = true
         });
 
-        var document = await Db.GetDocument(Category, "derived.md");
+        var document = await Documents.GetDocument(Category, "derived.md");
         document!.Indexed.Should().BeTrue();
 
-        await Db.DeleteEmbeddingsForDocument(document.Id);
+        await Embeddings.DeleteEmbeddingsForDocument(document.Id);
 
-        (await Db.GetDocument(Category, "derived.md"))!.Indexed.Should().BeFalse();
-        (await Db.GetDocumentSummary(Category, "derived.md"))!.Indexed.Should().BeFalse();
-        (await Db.GetDocumentIndex(Category)).Single().Indexed.Should().BeFalse();
+        (await Documents.GetDocument(Category, "derived.md"))!.Indexed.Should().BeFalse();
+        (await Documents.GetDocumentSummary(Category, "derived.md"))!.Indexed.Should().BeFalse();
+        (await Documents.GetDocumentIndex(Category)).Single().Indexed.Should().BeFalse();
     }
 
     [Fact]
@@ -328,7 +328,7 @@ public class DocumentCrudTests : McpServerTestBase
 
         response.ShouldHaveBeenRefused().Should().Contain("read-only");
 
-        (await Db.GetDocument("sealed_vault", "forbidden.md")).Should().BeNull();
+        (await Documents.GetDocument("sealed_vault", "forbidden.md")).Should().BeNull();
     }
 
     [Fact]
@@ -350,7 +350,7 @@ public class DocumentCrudTests : McpServerTestBase
         });
 
         added.ShouldHaveSucceeded();
-        (await Db.GetDocument("unsealed_vault", "permitted.md")).Should().NotBeNull();
+        (await Documents.GetDocument("unsealed_vault", "permitted.md")).Should().NotBeNull();
     }
 
     [Fact]

@@ -11,9 +11,9 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_ShouldFindUnindexedDocuments_WithinTheCategoryOnly()
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "crew.md", "# Crew\n\n## Mara Bluejay\n\nFirst officer.", summary: "The crew");
-        await Db.StoreDocument(Category, "ships.md", "# Ships\n\nThe Kestrel.", summary: null);
-        await Db.StoreDocument("other", "crew.md", "# Crew\n\nA different Bluejay.", summary: null);
+        await Documents.StoreDocument(Category, "crew.md", "# Crew\n\n## Mara Bluejay\n\nFirst officer.", summary: "The crew");
+        await Documents.StoreDocument(Category, "ships.md", "# Ships\n\nThe Kestrel.", summary: null);
+        await Documents.StoreDocument("other", "crew.md", "# Crew\n\nA different Bluejay.", summary: null);
 
         var response = await CallTool("1", "find_text", Arguments(("text", "bluejay")));
 
@@ -39,8 +39,8 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_ShouldTreatLikeWildcardsLiterally(string text)
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "literal.md", $"The note says {text} here.", summary: null);
-        await Db.StoreDocument(Category, "other.md", "The note says 500, axb, G, M, C:logs here.", summary: null);
+        await Documents.StoreDocument(Category, "literal.md", $"The note says {text} here.", summary: null);
+        await Documents.StoreDocument(Category, "other.md", "The note says 500, axb, G, M, C:logs here.", summary: null);
 
         var response = await CallTool("2", "find_text", Arguments(("text", text)));
 
@@ -52,7 +52,7 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_ShouldMatchAPhraseAcrossALineBreak()
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "lore.md", "They sheltered behind the Iron\r\nVeil for a week.", summary: null);
+        await Documents.StoreDocument(Category, "lore.md", "They sheltered behind the Iron\r\nVeil for a week.", summary: null);
 
         var response = await CallTool("3", "find_text", Arguments(("text", "the iron veil")));
 
@@ -64,8 +64,8 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_WithWholeWord_ShouldSkipDocumentsWhereTheTextIsOnlyPartOfAWord()
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "bluejay.md", "Mara Bluejay.", summary: null);
-        await Db.StoreDocument(Category, "jay.md", "Jay's ship.", summary: null);
+        await Documents.StoreDocument(Category, "bluejay.md", "Mara Bluejay.", summary: null);
+        await Documents.StoreDocument(Category, "jay.md", "Jay's ship.", summary: null);
 
         var response = await CallTool("4", "find_text", new Dictionary<string, object>
         {
@@ -82,8 +82,8 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_WithAFilename_ShouldSearchOnlyThatDocument()
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "crew.md", "Mara Bluejay.", summary: null);
-        await Db.StoreDocument(Category, "session_4.md", "Bluejay and Bluejay again.", summary: null);
+        await Documents.StoreDocument(Category, "crew.md", "Mara Bluejay.", summary: null);
+        await Documents.StoreDocument(Category, "session_4.md", "Bluejay and Bluejay again.", summary: null);
 
         var response = await CallTool("5", "find_text", Arguments(("text", "Bluejay"), ("filename", "crew.md")));
 
@@ -106,7 +106,7 @@ public class FindTextTests(TestFixture fixture) : McpServerTestBase(fixture)
     public async Task FindText_WhenNothingMatches_ShouldReturnAnEmptyList()
     {
         await ClearTestDocuments();
-        await Db.StoreDocument(Category, "ships.md", "The Kestrel.", summary: null);
+        await Documents.StoreDocument(Category, "ships.md", "The Kestrel.", summary: null);
 
         var response = await CallTool("7", "find_text", Arguments(("text", "Bluejay")));
 

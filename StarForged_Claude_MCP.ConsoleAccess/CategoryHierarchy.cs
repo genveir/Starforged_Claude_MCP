@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Repositories;
 
 namespace StarForged_Claude_MCP.ConsoleAccess;
 
@@ -8,9 +8,9 @@ namespace StarForged_Claude_MCP.ConsoleAccess;
 /// </summary>
 internal static class CategoryHierarchy
 {
-    public static async Task<bool> RequireLeaf(DbInterface dbInterface, string category)
+    public static async Task<bool> RequireLeaf(DocumentsRepository documents, string category)
     {
-        var subcategories = await dbInterface.GetCategoriesUnder(category);
+        var subcategories = await documents.GetCategoriesUnder(category);
         if (subcategories.Count == 0) return true;
 
         Console.Error.WriteLine(
@@ -18,11 +18,11 @@ internal static class CategoryHierarchy
         return false;
     }
 
-    public static async Task<bool> RequireCanHoldDocuments(DbInterface dbInterface, string category)
+    public static async Task<bool> RequireCanHoldDocuments(DocumentsRepository documents, string category)
     {
-        if (!await RequireLeaf(dbInterface, category)) return false;
+        if (!await RequireLeaf(documents, category)) return false;
 
-        var ancestors = await dbInterface.GetAncestorsHoldingDocuments(category);
+        var ancestors = await documents.GetAncestorsHoldingDocuments(category);
         if (ancestors.Count == 0) return true;
 
         Console.Error.WriteLine(

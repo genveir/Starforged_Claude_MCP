@@ -1,5 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
@@ -24,7 +24,8 @@ public abstract class McpServerTestBase
         };
     }
 
-    protected DbInterface Db => _fixture.Services.GetRequiredService<DbInterface>();
+    protected DocumentsRepository Documents => _fixture.Services.GetRequiredService<DocumentsRepository>();
+    protected EmbeddingsRepository Embeddings => _fixture.Services.GetRequiredService<EmbeddingsRepository>();
 
     protected void PermitWritesIn(params string[] categories)
     {
@@ -36,7 +37,7 @@ public abstract class McpServerTestBase
     protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>
         await McpServerInvoker.HandleRequestAsync(_server, request);
 
-    protected async Task ClearTestDocuments() => await Db.DeleteAllDocuments();
+    protected async Task ClearTestDocuments() => await Documents.DeleteAllDocuments();
 
     protected async Task<JsonRpcResponse> CallTool(string id, string name, Dictionary<string, object> arguments) =>
         await InvokeServerMethod(new JsonRpcRequest

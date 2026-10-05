@@ -149,7 +149,7 @@ public class CategoryHierarchyTests : McpServerTestBase
         });
 
         response.ShouldHaveBeenRefused().Should().Contain("parent category").And.Contain(Oracles);
-        (await Db.GetDocumentIndex(Parent)).Should().BeEmpty();
+        (await Documents.GetDocumentIndex(Parent)).Should().BeEmpty();
     }
 
     [Fact]
@@ -168,7 +168,7 @@ public class CategoryHierarchyTests : McpServerTestBase
         });
 
         response.ShouldHaveBeenRefused().Should().Contain($"'{Oracles}' above it already does");
-        (await Db.GetDocumentIndex("Campaign.Oracles.Moons")).Should().BeEmpty();
+        (await Documents.GetDocumentIndex("Campaign.Oracles.Moons")).Should().BeEmpty();
     }
 
     [Theory]

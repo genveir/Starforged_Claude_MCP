@@ -1,39 +1,24 @@
 using Dapper;
-using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 using StarForged_Claude_MCP.Database.Models;
+using StarForged_Claude_MCP.Database.Util;
 
-namespace StarForged_Claude_MCP.Database;
+namespace StarForged_Claude_MCP.Database.Repositories;
 
-public class DbInterface
+public class DocumentsRepository
 {
-    private readonly string _connectionString;
+    private readonly DbConnectionFactory _connections;
 
-    public DbInterface(IConfiguration configuration)
+    public DocumentsRepository(DbConnectionFactory connections)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+        _connections = connections;
     }
-
-    // ---------- Documents ----------
 
     private const string IndexedColumn =
         "cast(case when exists (select 1 from Embeddings e where e.DocumentId = d.Id) then 1 else 0 end as bit) as Indexed";
 
-    /// <summary>
-    /// Matches a category and every category under it, given @Category and @Prefix as <see cref="InScope"/>
-    /// binds them. The leading characters are compared rather than matched with LIKE, so that an '_' or '%'
-    /// in a category name is never read as a wildcard.
-    /// </summary>
-    private const string CategoryInScope =
-        "(d.Category = @Category or left(d.Category, len(@Prefix)) = @Prefix)";
-
-    private static object InScope(string category) =>
-        new { Category = category, Prefix = CategoryPath.DescendantPrefix(category) };
-
     public async Task<int> StoreDocument(string category, string filename, string content, string? summary)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         return await connection.QuerySingleAsync<int>(
             """
             insert into Documents (Category, Filename, Content, Summary)
@@ -45,7 +30,7 @@ public class DbInterface
 
     public async Task<Document?> GetDocument(string category, string filename)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         return await connection.QuerySingleOrDefaultAsync<Document>(
             $"select d.Id, d.Category, d.Filename, d.Content, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category and d.Filename = @Filename",
@@ -54,7 +39,7 @@ public class DbInterface
 
     public async Task<DocumentIndexEntry?> GetDocumentSummary(string category, string filename)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         return await connection.QuerySingleOrDefaultAsync<DocumentIndexEntry>(
             $"select d.Filename, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category and d.Filename = @Filename",
@@ -63,7 +48,7 @@ public class DbInterface
 
     public async Task<List<DocumentIndexEntry>> GetDocumentIndex(string category)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         var results = await connection.QueryAsync<DocumentIndexEntry>(
             $"select d.Filename, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category order by d.Filename",
@@ -82,16 +67,20 @@ public class DbInterface
         var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(EscapeLike);
         var pattern = $"%{string.Join("%", words)}%";
 
-        using var connection = new SqlConnection(_connectionString);
+        var parameters = CategoryPath.InScopeParameters(category);
+        parameters.Add("Filename", filename);
+        parameters.Add("Pattern", pattern);
+
+        using var connection = _connections.Create();
         var results = await connection.QueryAsync<Document>(
             $"""
             select d.Id, d.Category, d.Filename, d.Content, d.Summary
             from Documents d
-            where {CategoryInScope}
+            where {CategoryPath.InScopeSql}
               and (@Filename is null or d.Filename = @Filename)
               and d.Content collate Latin1_General_100_CI_AS like @Pattern escape '\'
             """,
-            new { Category = category, Prefix = CategoryPath.DescendantPrefix(category), Filename = filename, Pattern = pattern });
+            parameters);
         return results.ToList();
     }
 
@@ -103,7 +92,7 @@ public class DbInterface
 
     public async Task<List<string>> GetCategories()
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         var results = await connection.QueryAsync<string>(
             "select distinct Category from Documents order by Category");
         return results.ToList();
@@ -115,7 +104,7 @@ public class DbInterface
     /// </summary>
     public async Task<List<string>> GetCategoriesUnder(string category)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         var results = await connection.QueryAsync<string>(
             "select distinct d.Category from Documents d where left(d.Category, len(@Prefix)) = @Prefix order by d.Category",
             new { Prefix = CategoryPath.DescendantPrefix(category) });
@@ -130,7 +119,7 @@ public class DbInterface
         var ancestors = CategoryPath.Ancestors(category);
         if (ancestors.Count == 0) return [];
 
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         var results = await connection.QueryAsync<string>(
             "select distinct d.Category from Documents d where d.Category in @Ancestors",
             new { Ancestors = ancestors });
@@ -139,7 +128,7 @@ public class DbInterface
 
     public async Task UpdateDocument(int id, string content, string? summary)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         await connection.ExecuteAsync(
             "update Documents set Content = @Content, Summary = @Summary where Id = @Id",
             new { Id = id, Content = content, Summary = summary });
@@ -147,100 +136,13 @@ public class DbInterface
 
     public async Task DeleteDocument(int id)
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         await connection.ExecuteAsync("delete from Documents where Id = @Id", new { Id = id });
     }
 
     public async Task DeleteAllDocuments()
     {
-        using var connection = new SqlConnection(_connectionString);
+        using var connection = _connections.Create();
         await connection.ExecuteAsync("delete from Documents");
-    }
-
-    // ---------- Embeddings ----------
-
-    public async Task<int> WriteEmbedding(string text, int tokenCount, float[] vector, int documentId)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        return await connection.QuerySingleAsync<int>(
-            """
-            insert into Embeddings (DocumentId, Text, Vector, TokenCount)
-            output inserted.Id
-            values (@DocumentId, @Text, @Vector, @TokenCount)
-            """,
-            new { DocumentId = documentId, Text = text, Vector = FloatsToBytes(vector), TokenCount = tokenCount });
-    }
-
-    public async Task DeleteEmbeddingsForDocument(int documentId)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Embeddings where DocumentId = @DocumentId", new { DocumentId = documentId });
-    }
-
-    public async Task<List<TextResult>> GetEmbeddedTextByIds(int[] ids)
-    {
-        if (ids.Length == 0) return [];
-
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<TextResult>(
-            """
-            select e.Id, e.Text, d.Category, d.Filename
-            from Embeddings e
-            join Documents d on d.Id = e.DocumentId
-            where e.Id in @Ids
-            """,
-            new { Ids = ids });
-        return results.ToList();
-    }
-
-    /// <summary>
-    /// The vectors of every indexed document in <paramref name="category"/> or any category under it.
-    /// </summary>
-    public async Task<List<VectorResult>> GetVectorsForCategory(string category)
-    {
-        using var connection = new SqlConnection(_connectionString);
-        var results = await connection.QueryAsync<dynamic>(
-            $"""
-            select e.Id, e.Vector
-            from Embeddings e
-            join Documents d on d.Id = e.DocumentId
-            where {CategoryInScope}
-            """,
-            InScope(category));
-
-        return results.Select(r => new VectorResult
-        {
-            Id = r.Id,
-            Vector = BytesToFloats((byte[])r.Vector)
-        }).ToList();
-    }
-
-    public async Task DeleteAllEmbeddings()
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.ExecuteAsync("delete from Embeddings");
-    }
-
-    public async Task TestConnection()
-    {
-        using var connection = new SqlConnection(_connectionString);
-        await connection.QueryAsync<dynamic>("select top 0 Id, Category, Filename, Content, Summary from Documents");
-        await connection.QueryAsync<dynamic>("select top 0 Id, DocumentId, Text, Vector, TokenCount from Embeddings");
-    }
-
-    private static byte[] FloatsToBytes(float[] floats)
-    {
-        var bytes = new byte[floats.Length * 4];
-        Buffer.BlockCopy(floats, 0, bytes, 0, bytes.Length);
-        return bytes;
-    }
-
-    private static float[] BytesToFloats(byte[] bytes)
-    {
-        if (bytes.Length % 4 != 0) return [];
-
-        var floats = new float[bytes.Length / 4];
-        Buffer.BlockCopy(bytes, 0, floats, 0, bytes.Length);
-        return floats;
     }
 }

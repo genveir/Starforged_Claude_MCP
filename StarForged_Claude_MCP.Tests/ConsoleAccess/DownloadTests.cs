@@ -15,9 +15,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "First content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
-        await Db.StoreDocument("some_other_category", "three.md", "Not in this category.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "First content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument("some_other_category", "three.md", "Not in this category.", summary: null);
 
         var target = Path.Combine(folder.Path, "not_yet_created");
         await Download(new DownloadOptions(Category, target, DownloadMode.Folder));
@@ -32,8 +32,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
         folder.Write("one.md", "Local content.");
 
         await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
@@ -48,7 +48,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         folder.Write("one.md", "Local content.");
 
         await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
@@ -62,9 +62,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
-        await Db.StoreDocument(Category, "three.md", "Third content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument(Category, "three.md", "Third content.", summary: null);
         folder.Write("one.md", "Local content.");
 
         var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true));
@@ -80,8 +80,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
         folder.Write("one.md", "Stored content.");
         folder.Write("two.md", "Local content.");
 
@@ -102,8 +102,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
         folder.Write("one.md", "Stored content.");
         folder.Write("two.md", "Local content.");
 
@@ -121,8 +121,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs", "kira.md", "Kira.", summary: null);
+        await Documents.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs", "kira.md", "Kira.", summary: null);
         folder.Write(Path.Combine("Oracles", "moves.md"), "The moves.");
 
         var output = await DownloadCapturingOutput(
@@ -139,9 +139,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "two.md", "Second content.", summary: null);
-        await Db.StoreDocument(Category, "three.md", "Third content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "two.md", "Second content.", summary: null);
+        await Documents.StoreDocument(Category, "three.md", "Third content.", summary: null);
         folder.Write("one.md", "Stored content.");
         folder.Write("two.md", "Local content.");
 
@@ -160,10 +160,10 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs.Rivals", "vex.md", "Vex.", summary: null);
-        await Db.StoreDocument("some_other_category", "other.md", "Not under this parent.", summary: null);
+        await Documents.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Rivals", "vex.md", "Vex.", summary: null);
+        await Documents.StoreDocument("some_other_category", "other.md", "Not under this parent.", summary: null);
 
         await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder));
 
@@ -182,9 +182,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs.Allies", "tam.md", "Tam.", summary: null);
+        await Documents.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Allies", "tam.md", "Tam.", summary: null);
         folder.Write(Path.Combine("Oracles", "moves.md"), "Local moves.");
         folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), "Local Kira.");
 
@@ -204,8 +204,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
-        await Db.StoreDocument(Category, "crew.md", "The crew.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "crew.md", "The crew.", summary: null);
 
         var target = Path.Combine(folder.Path, "renamed.md");
         await Download(new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md"));
@@ -220,7 +220,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
 
         await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Document, Filename: "ship.md"));
 
@@ -233,7 +233,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
 
         var target = Path.Combine(folder.Path, "new_folder") + Path.DirectorySeparatorChar;
         await Download(new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md"));
@@ -247,7 +247,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
         folder.Write("ship.md", "Local content.");
         var target = Path.Combine(folder.Path, "ship.md");
 
@@ -264,7 +264,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
         var target = Path.Combine(folder.Path, "ship.md");
         var options = new DownloadOptions(Category, target, DownloadMode.Document, Filename: "ship.md", Overwrite: true);
 
@@ -281,7 +281,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
         folder.Write("ship.md", "The ship.");
         var target = Path.Combine(folder.Path, "ship.md");
 
@@ -307,7 +307,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         folder.Write("stray.md", "Not in the store.");
         folder.Write(Path.Combine("Old", "Deep", "gone.md"), "Not in the store.");
         folder.Write("map.png", "Not markdown.");
@@ -333,7 +333,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         folder.Write("stray.md", "Not in the store.");
         confirmPrompt.Answer = false;
 
@@ -350,7 +350,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         for (var i = 0; i <= FileDownloader.MaxCleanDeletions; i++)
         {
             folder.Write($"stray{i}.md", "Not in the store.");
@@ -370,7 +370,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         folder.Write("one.md", "Local content.");
 
         await Download(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, Overwrite: true, Clean: true));
@@ -385,8 +385,8 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
-        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Documents.StoreDocument($"{Category}.Oracles", "moves.md", "The moves.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
         folder.Write(Path.Combine("Npcs", "Allies", "kira.md"), "Local Kira.");
         folder.Write(Path.Combine("Npcs", "Rivals", "vex.md"), "Not in the store.");
         confirmPrompt.Answer = true;
@@ -405,9 +405,9 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "new.md", "New content.", summary: null);
-        await Db.StoreDocument(Category, "changed.md", "Stored content.", summary: null);
-        await Db.StoreDocument(Category, "same.md", "Same content.", summary: null);
+        await Documents.StoreDocument(Category, "new.md", "New content.", summary: null);
+        await Documents.StoreDocument(Category, "changed.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "same.md", "Same content.", summary: null);
         folder.Write("changed.md", "Local content.");
         folder.Write("same.md", "Same content.");
         folder.Write("stray.md", "Not in the store.");
@@ -436,7 +436,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
+        await Documents.StoreDocument($"{Category}.Npcs.Allies", "kira.md", "Kira.", summary: null);
         folder.Write(Path.Combine("Npcs", "Allies", "old_kira.md"), "Not in the store.");
         folder.Write(Path.Combine("Npcs", "Rivals", "vex.md"), "Not in the store.");
 
@@ -454,7 +454,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "one.md", "Stored content.", summary: null);
+        await Documents.StoreDocument(Category, "one.md", "Stored content.", summary: null);
         folder.Write("one.md", "Local content.");
 
         var output = await DownloadCapturingOutput(new DownloadOptions(Category, folder.Path, DownloadMode.Folder, DryRun: true));
@@ -469,7 +469,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
         await ClearTestDocuments();
         using var folder = new TempFolder();
 
-        await Db.StoreDocument(Category, "ship.md", "The ship.", summary: null);
+        await Documents.StoreDocument(Category, "ship.md", "The ship.", summary: null);
         var target = Path.Combine(folder.Path, "ship.md");
 
         var output = await DownloadCapturingOutput(
@@ -482,7 +482,7 @@ public class DownloadTests(TestFixture fixture) : McpServerTestBase(fixture)
     private readonly RecordingConfirmPrompt confirmPrompt = new();
 
     private async Task Download(DownloadOptions options) =>
-        await new FileDownloader(Db, confirmPrompt).DownloadFile(options);
+        await new FileDownloader(Documents, confirmPrompt).DownloadFile(options);
 
     private async Task<string> DownloadCapturingOutput(DownloadOptions options)
     {

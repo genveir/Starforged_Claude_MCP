@@ -1,19 +1,19 @@
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Repositories;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Cat;
 
 public class DocumentPrinter
 {
-    private readonly DbInterface dbInterface;
+    private readonly DocumentsRepository documents;
 
-    public DocumentPrinter(DbInterface dbInterface)
+    public DocumentPrinter(DocumentsRepository documents)
     {
-        this.dbInterface = dbInterface;
+        this.documents = documents;
     }
 
     public async Task Print(CatOptions options)
     {
-        var document = await dbInterface.GetDocument(options.Category, options.Filename);
+        var document = await documents.GetDocument(options.Category, options.Filename);
 
         if (document == null)
         {

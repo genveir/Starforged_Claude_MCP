@@ -1,5 +1,6 @@
-using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Database.Models;
+using StarForged_Claude_MCP.Database.Repositories;
+using StarForged_Claude_MCP.Database.Util;
 using StarForged_Claude_MCP.Embeddings.Services;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
@@ -7,18 +8,18 @@ namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 public class FileUploader
 {
     private readonly IDocumentProcessingService documentProcessingService;
-    private readonly DbInterface dbInterface;
+    private readonly DocumentsRepository documents;
     private readonly ISummaryPrompt summaryPrompt;
     private readonly IIndexPrompt indexPrompt;
 
     public FileUploader(
         IDocumentProcessingService documentProcessingService,
-        DbInterface dbInterface,
+        DocumentsRepository documents,
         ISummaryPrompt summaryPrompt,
         IIndexPrompt indexPrompt)
     {
         this.documentProcessingService = documentProcessingService;
-        this.dbInterface = dbInterface;
+        this.documents = documents;
         this.summaryPrompt = summaryPrompt;
         this.indexPrompt = indexPrompt;
     }
@@ -47,7 +48,7 @@ public class FileUploader
                     Console.Error.WriteLine($"Error: File '{options.SourcePath}' does not exist.");
                     return;
                 }
-                if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, options.Category)) return;
+                if (!await CategoryHierarchy.RequireCanHoldDocuments(documents, options.Category)) return;
                 await UploadFilesAsync(
                     options.Category, [options.SourcePath], options.Index, options.Summaries, options.DryRun, options.Verbosity,
                     isOutermost: true);
@@ -76,7 +77,7 @@ public class FileUploader
 
         foreach (var leaf in leaves)
         {
-            if (!await CategoryHierarchy.RequireCanHoldDocuments(dbInterface, leaf.Category)) return;
+            if (!await CategoryHierarchy.RequireCanHoldDocuments(documents, leaf.Category)) return;
         }
 
         if (leaves is [var only] && only.Category == category)
@@ -167,7 +168,7 @@ public class FileUploader
             var text = await File.ReadAllTextAsync(filePath);
             var filename = Path.GetFileName(filePath);
 
-            var existing = await dbInterface.GetDocument(category, filename);
+            var existing = await documents.GetDocument(category, filename);
 
             // Asked for before anything is written, so that abandoning a run part way through
             // never leaves a document stored without the answers that were being typed for it.
@@ -254,7 +255,7 @@ public class FileUploader
 
     private async Task<int> StoreDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
     {
-        var id = await dbInterface.StoreDocument(category, filename, content, summary);
+        var id = await documents.StoreDocument(category, filename, content, summary);
 
         if (indexed)
         {
@@ -282,7 +283,7 @@ public class FileUploader
 
         if ((contentChanged || summaryChanged) && !dryRun)
         {
-            await dbInterface.UpdateDocument(existing.Id, content, summary);
+            await documents.UpdateDocument(existing.Id, content, summary);
         }
 
         if (indexed && (contentChanged || !existing.Indexed))

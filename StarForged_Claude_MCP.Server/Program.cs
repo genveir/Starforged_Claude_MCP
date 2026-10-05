@@ -102,7 +102,7 @@ public class Program
         }
 
         // Validate database connectivity
-        var db = services.GetRequiredService<DbInterface>();
+        var db = services.GetRequiredService<DbConnectionFactory>();
         await db.TestConnection();
     }
 }

@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Util;
 
 namespace StarForged_Claude_MCP.ConsoleAccess;
 

@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
 namespace StarForged_Claude_MCP.Embeddings.Services;
@@ -22,18 +22,18 @@ internal class DocumentProcessingService : IDocumentProcessingService
     private readonly MarkdownPreprocessor markdownPreprocessor;
     private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
     private readonly EmbeddingsService embeddingsService;
-    private readonly DbInterface dbInterface;
+    private readonly EmbeddingsRepository embeddings;
 
     public DocumentProcessingService(
         MarkdownPreprocessor markdownPreprocessor,
         UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
         EmbeddingsService embeddingsService,
-        DbInterface dbInterface)
+        EmbeddingsRepository embeddings)
     {
         this.markdownPreprocessor = markdownPreprocessor;
         this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
         this.embeddingsService = embeddingsService;
-        this.dbInterface = dbInterface;
+        this.embeddings = embeddings;
     }
 
     public async Task<int[]> IndexDocumentAsync(string documentText, int documentId, DocumentProcessorToUse processorToUse)
@@ -45,14 +45,14 @@ internal class DocumentProcessingService : IDocumentProcessingService
             _ => throw new ArgumentException("No processor available for this type of document, it cannot be stored.")
         };
 
-        await dbInterface.DeleteEmbeddingsForDocument(documentId);
+        await embeddings.DeleteEmbeddingsForDocument(documentId);
 
         List<int> storedChunkIds = [];
 
         foreach (var chunk in preprocessedText.Chunks)
         {
             var embedding = embeddingsService.GenerateEmbeddings(chunk);
-            storedChunkIds.Add(await dbInterface.WriteEmbedding(
+            storedChunkIds.Add(await embeddings.WriteEmbedding(
                 text: chunk.Text,
                 tokenCount: chunk.Tokens.Length,
                 vector: embedding,
@@ -63,5 +63,5 @@ internal class DocumentProcessingService : IDocumentProcessingService
     }
 
     public async Task RemoveIndexForDocumentAsync(int documentId) =>
-        await dbInterface.DeleteEmbeddingsForDocument(documentId);
+        await embeddings.DeleteEmbeddingsForDocument(documentId);
 }

@@ -520,7 +520,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "E"),
             ("text", Lines("## E", "", "rewritten E"))))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Summary.Should().Be("The summary it was stored with",
+        (await Documents.GetDocument(Category, Filename))!.Summary.Should().Be("The summary it was stored with",
             because: "an edit to one section says nothing about the document's summary");
     }
 
@@ -534,13 +534,13 @@ public class SectionEditingTests : McpServerTestBase
             ("text", "A closing line."),
             ("summary", "A newer summary")))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Summary.Should().Be("A newer summary");
+        (await Documents.GetDocument(Category, Filename))!.Summary.Should().Be("A newer summary");
 
         (await CallTool("47", "append_to_document", Arguments(
             ("text", "Another closing line."),
             ("summary", "")))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Summary.Should().BeNull(
+        (await Documents.GetDocument(Category, Filename))!.Summary.Should().BeNull(
             because: "an empty summary is how a write asks for the stored one to go");
     }
 
@@ -557,7 +557,7 @@ public class SectionEditingTests : McpServerTestBase
             ["text"] = Lines("# B", "", "an entirely new body")
         })).ShouldHaveSucceeded();
 
-        var document = await Db.GetDocument(Category, Filename);
+        var document = await Documents.GetDocument(Category, Filename);
         document!.Content.Should().Be(Lines("# B", "", "an entirely new body"));
         document.Summary.Should().Be("The summary it was stored with");
     }
@@ -572,7 +572,7 @@ public class SectionEditingTests : McpServerTestBase
             ("section", "E"),
             ("text", Lines("## E", "", "A luminous derelict hangs above the shattered moon."))))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
+        (await Documents.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
 
         var results = await CallTool("52", "search_index", new Dictionary<string, object>
         {
@@ -592,7 +592,7 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("54", "append_to_document", Arguments(("text", "A closing line.")))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeFalse(
+        (await Documents.GetDocument(Category, Filename))!.Indexed.Should().BeFalse(
             because: "editing a document is not a decision to start indexing it");
     }
 
@@ -604,13 +604,13 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("56", "update_document", UpdateArguments(indexed: true))).ShouldHaveSucceeded();
 
-        var indexed = await Db.GetDocument(Category, Filename);
+        var indexed = await Documents.GetDocument(Category, Filename);
         indexed!.Indexed.Should().BeTrue();
         indexed.Content.Should().Be(Nested);
 
         (await CallTool("57", "update_document", UpdateArguments(indexed: false))).ShouldHaveSucceeded();
 
-        var deindexed = await Db.GetDocument(Category, Filename);
+        var deindexed = await Documents.GetDocument(Category, Filename);
         deindexed!.Indexed.Should().BeFalse();
         deindexed.Content.Should().Be(Nested, because: "de-indexing drops the embeddings, not the document");
     }
@@ -623,7 +623,7 @@ public class SectionEditingTests : McpServerTestBase
 
         (await CallTool("106", "update_document", Arguments(("text", Nested)))).ShouldHaveSucceeded();
 
-        (await Db.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
+        (await Documents.GetDocument(Category, Filename))!.Indexed.Should().BeTrue();
     }
 
     private static Dictionary<string, object> UpdateArguments(bool indexed)

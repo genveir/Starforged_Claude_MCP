@@ -1,5 +1,5 @@
-using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Database.Models;
+using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
@@ -8,20 +8,20 @@ namespace StarForged_Claude_MCP.Server.Services;
 
 public class DocumentsFacade : IDocumentsFacade
 {
-    private readonly DbInterface _dbInterface;
+    private readonly DocumentsRepository _documents;
     private readonly IDocumentProcessingService _documentProcessing;
 
-    public DocumentsFacade(DbInterface dbInterface, IDocumentProcessingService documentProcessing)
+    public DocumentsFacade(DocumentsRepository documents, IDocumentProcessingService documentProcessing)
     {
-        _dbInterface = dbInterface;
+        _documents = documents;
         _documentProcessing = documentProcessing;
     }
 
     public async Task<bool> AddDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
     {
-        if (await _dbInterface.GetDocument(category, filename) != null) return false;
+        if (await _documents.GetDocument(category, filename) != null) return false;
 
-        var id = await _dbInterface.StoreDocument(category, filename, content, NullIfBlank(summary));
+        var id = await _documents.StoreDocument(category, filename, content, NullIfBlank(summary));
 
         if (indexed)
         {
@@ -52,35 +52,35 @@ public class DocumentsFacade : IDocumentsFacade
 
     public async Task<bool> DeleteDocumentAsync(string category, string filename)
     {
-        var existing = await _dbInterface.GetDocument(category, filename);
+        var existing = await _documents.GetDocument(category, filename);
         if (existing == null) return false;
 
-        await _dbInterface.DeleteDocument(existing.Id);
+        await _documents.DeleteDocument(existing.Id);
         return true;
     }
 
     public async Task<Document?> GetDocumentAsync(string category, string filename) =>
-        await _dbInterface.GetDocument(category, filename);
+        await _documents.GetDocument(category, filename);
 
     public async Task<DocumentIndexEntry?> GetDocumentSummaryAsync(string category, string filename) =>
-        await _dbInterface.GetDocumentSummary(category, filename);
+        await _documents.GetDocumentSummary(category, filename);
 
     public async Task<List<DocumentIndexEntry>> GetDocumentIndexAsync(string category) =>
-        await _dbInterface.GetDocumentIndex(category);
+        await _documents.GetDocumentIndex(category);
 
     public async Task<TextSearchResult?> FindTextAsync(string category, string text, bool wholeWord, string? filename)
     {
-        if (filename != null && await _dbInterface.GetDocumentSummary(category, filename) == null) return null;
+        if (filename != null && await _documents.GetDocumentSummary(category, filename) == null) return null;
 
-        var candidates = await _dbInterface.FindDocumentsContaining(category, text, filename);
+        var candidates = await _documents.FindDocumentsContaining(category, text, filename);
         return DocumentTextSearch.Search(candidates, text, wholeWord);
     }
 
     public async Task<List<string>> GetSubcategoriesAsync(string category) =>
-        await _dbInterface.GetCategoriesUnder(category);
+        await _documents.GetCategoriesUnder(category);
 
     public async Task<List<string>> GetAncestorsHoldingDocumentsAsync(string category) =>
-        await _dbInterface.GetAncestorsHoldingDocuments(category);
+        await _documents.GetAncestorsHoldingDocuments(category);
 
     /// <summary>
     /// The one path every content write takes: rewrite the content, keep the summary unless this
@@ -90,12 +90,12 @@ public class DocumentsFacade : IDocumentsFacade
     /// </summary>
     private async Task<bool> WriteAsync(string category, string filename, string? summary, Func<Document, string> rewrite, bool? indexed = null)
     {
-        var existing = await _dbInterface.GetDocument(category, filename);
+        var existing = await _documents.GetDocument(category, filename);
         if (existing == null) return false;
 
         var content = rewrite(existing);
 
-        await _dbInterface.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
+        await _documents.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
 
         if (indexed ?? existing.Indexed)
         {
@@ -116,12 +116,12 @@ public class DocumentsFacade : IDocumentsFacade
     private async Task<TResult?> WriteAsync<TResult>(string category, string filename, string? summary, Func<Document, (string Content, TResult Result)> rewrite)
         where TResult : struct
     {
-        var existing = await _dbInterface.GetDocument(category, filename);
+        var existing = await _documents.GetDocument(category, filename);
         if (existing == null) return null;
 
         var (content, result) = rewrite(existing);
 
-        await _dbInterface.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
+        await _documents.UpdateDocument(existing.Id, content, ResolveSummary(existing.Summary, summary));
 
         if (existing.Indexed)
         {

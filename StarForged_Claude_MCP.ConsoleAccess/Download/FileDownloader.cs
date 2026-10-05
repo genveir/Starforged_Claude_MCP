@@ -1,5 +1,6 @@
-using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Database.Models;
+using StarForged_Claude_MCP.Database.Repositories;
+using StarForged_Claude_MCP.Database.Util;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
@@ -7,12 +8,12 @@ public class FileDownloader
 {
     public const int MaxCleanDeletions = 100;
 
-    private readonly DbInterface dbInterface;
+    private readonly DocumentsRepository documents;
     private readonly IConfirmPrompt confirmPrompt;
 
-    public FileDownloader(DbInterface dbInterface, IConfirmPrompt confirmPrompt)
+    public FileDownloader(DocumentsRepository documents, IConfirmPrompt confirmPrompt)
     {
-        this.dbInterface = dbInterface;
+        this.documents = documents;
         this.confirmPrompt = confirmPrompt;
     }
 
@@ -90,10 +91,10 @@ public class FileDownloader
 
     private async Task<List<LeafDownload>> PlanFolderAsync(string category, string folderPath)
     {
-        var leaves = await dbInterface.GetCategoriesUnder(category);
+        var leaves = await documents.GetCategoriesUnder(category);
         if (leaves.Count == 0)
         {
-            var index = await dbInterface.GetDocumentIndex(category);
+            var index = await documents.GetDocumentIndex(category);
             return index.Count == 0 ? [] : [new LeafDownload(category, folderPath, index)];
         }
 
@@ -103,7 +104,7 @@ public class FileDownloader
             var relativeSegments = leaf[(category.Length + 1)..].Split(CategoryPath.Separator).Select(SanitiseFileName);
             var leafFolder = Path.Combine([folderPath, .. relativeSegments]);
 
-            plan.Add(new LeafDownload(leaf, leafFolder, await dbInterface.GetDocumentIndex(leaf)));
+            plan.Add(new LeafDownload(leaf, leafFolder, await documents.GetDocumentIndex(leaf)));
         }
 
         return plan;
@@ -271,7 +272,7 @@ public class FileDownloader
         {
             var path = leaf.PathFor(entry);
 
-            var document = await dbInterface.GetDocument(leaf.Category, entry.Filename);
+            var document = await documents.GetDocument(leaf.Category, entry.Filename);
             if (document == null) continue;
 
             var existing = await CompareWithExistingAsync(path, document.Content);
@@ -318,7 +319,7 @@ public class FileDownloader
 
     private async Task DownloadDocumentAsync(string category, string filename, string targetPath, bool overwrite, bool dryRun)
     {
-        var document = await dbInterface.GetDocument(category, filename);
+        var document = await documents.GetDocument(category, filename);
 
         if (document == null)
         {

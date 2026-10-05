@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Util;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Server.Tools;

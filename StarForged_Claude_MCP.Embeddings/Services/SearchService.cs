@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
@@ -14,17 +14,17 @@ internal class SearchService : ISearchService
 {
     private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
     private readonly EmbeddingsService embeddingsService;
-    private readonly DbInterface dbInterface;
+    private readonly EmbeddingsRepository embeddings;
     private readonly ILogger<SearchService> logger;
 
     public SearchService(UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
         EmbeddingsService embeddingsService,
-        DbInterface dbInterface,
+        EmbeddingsRepository embeddings,
         ILogger<SearchService> logger)
     {
         this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
         this.embeddingsService = embeddingsService;
-        this.dbInterface = dbInterface;
+        this.embeddings = embeddings;
         this.logger = logger;
     }
 
@@ -38,7 +38,7 @@ internal class SearchService : ISearchService
 
         var ids = similarityResults.Select(r => r.Id).ToArray();
 
-        var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
+        var textResults = await embeddings.GetEmbeddedTextByIds(ids);
 
         var results = similarityResults
             .Join(textResults, sim => sim.Id, text => text.Id,
@@ -54,7 +54,7 @@ internal class SearchService : ISearchService
 
         logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
 
-        var vectors = await dbInterface.GetVectorsForCategory(category);
+        var vectors = await embeddings.GetVectorsForCategory(category);
 
         logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
 
