@@ -2,18 +2,17 @@ using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
-namespace StarForged_Claude_MCP.Embeddings
+namespace StarForged_Claude_MCP.Embeddings;
+
+public static class EmbeddingsServicesExtension
 {
-    public static class EmbeddingsServicesExtension
+    public static IServiceCollection AddEmbeddingsServices(this IServiceCollection services)
     {
-        public static IServiceCollection AddEmbeddingsServices(this IServiceCollection services)
-        {
-            services.AddSingleton<MarkdownPreprocessor>();
-            services.AddSingleton<UnchunkableFlatTextPreprocessor>();
-            services.AddSingleton<IDocumentProcessingService, DocumentProcessingService>();
-            services.AddSingleton<ISearchService, SearchService>();
-            services.AddSingleton<EmbeddingsService>();
-            return services;
-        }
+        services.AddSingleton<MarkdownPreprocessor>();
+        services.AddSingleton<UnchunkableFlatTextPreprocessor>();
+        services.AddSingleton<IDocumentProcessingService, DocumentProcessingService>();
+        services.AddSingleton<ISearchService, SearchService>();
+        services.AddSingleton<EmbeddingsService>();
+        return services;
     }
 }

@@ -1,6 +1,5 @@
-﻿namespace StarForged_Claude_MCP.ConsoleAccess
+﻿namespace StarForged_Claude_MCP.ConsoleAccess;
+
+internal interface IConsoleAccessOptions
 {
-    internal interface IConsoleAccessOptions
-    {
-    }
 }

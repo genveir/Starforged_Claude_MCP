@@ -3,90 +3,89 @@ using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
-namespace StarForged_Claude_MCP.Embeddings.Services
+namespace StarForged_Claude_MCP.Embeddings.Services;
+
+public interface ISearchService
 {
-    public interface ISearchService
+    Task<SearchResult[]> Search(string input, string category, int topK);
+}
+
+internal class SearchService : ISearchService
+{
+    private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
+    private readonly EmbeddingsService embeddingsService;
+    private readonly DbInterface dbInterface;
+    private readonly ILogger<SearchService> logger;
+
+    public SearchService(UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
+        EmbeddingsService embeddingsService,
+        DbInterface dbInterface,
+        ILogger<SearchService> logger)
     {
-        Task<SearchResult[]> Search(string input, string category, int topK);
+        this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
+        this.embeddingsService = embeddingsService;
+        this.dbInterface = dbInterface;
+        this.logger = logger;
     }
 
-    internal class SearchService : ISearchService
+    public async Task<SearchResult[]> Search(string input, string category, int topK)
     {
-        private readonly UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor;
-        private readonly EmbeddingsService embeddingsService;
-        private readonly DbInterface dbInterface;
-        private readonly ILogger<SearchService> logger;
+        logger.LogInformation("Starting search in category {Category} with input: {Input} and topK: {TopK}", category, input, topK);
 
-        public SearchService(UnchunkableFlatTextPreprocessor unchunkableFlatTextPreprocessor,
-            EmbeddingsService embeddingsService,
-            DbInterface dbInterface,
-            ILogger<SearchService> logger)
+        var inputChunk = unchunkableFlatTextPreprocessor.Process(input).Chunks.Single();
+
+        var similarityResults = await PerformSimilaritySearch(inputChunk, category, topK);
+
+        var ids = similarityResults.Select(r => r.Id).ToArray();
+
+        var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
+
+        var results = similarityResults
+            .Join(textResults, sim => sim.Id, text => text.Id,
+                (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id, Category: text.Category, Filename: text.Filename))
+            .ToArray();
+
+        return results;
+    }
+
+    private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, string category, int topK)
+    {
+        var queryVector = embeddingsService.GenerateEmbeddings(input);
+
+        logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
+
+        var vectors = await dbInterface.GetVectorsForCategory(category);
+
+        logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
+
+        var similarities = vectors
+            .Select(v => new { v.Id, Similarity = CosineSimilarity(queryVector, v.Vector) })
+            .OrderByDescending(x => x.Similarity)
+            .Take(topK)
+            .Select(x => new SimilarityResult(Id: x.Id, SimilarityScore: x.Similarity))
+            .ToArray();
+
+        logger.LogInformation("Similarity search completed. Top {TopK} IDs: {Ids}", topK, similarities);
+
+        return similarities;
+    }
+
+    private static float CosineSimilarity(float[] a, float[] b)
+    {
+        if (a.Length != b.Length) return 0;
+
+        float dotProduct = 0;
+        float magnitudeA = 0;
+        float magnitudeB = 0;
+
+        for (int i = 0; i < a.Length; i++)
         {
-            this.unchunkableFlatTextPreprocessor = unchunkableFlatTextPreprocessor;
-            this.embeddingsService = embeddingsService;
-            this.dbInterface = dbInterface;
-            this.logger = logger;
+            dotProduct += a[i] * b[i];
+            magnitudeA += a[i] * a[i];
+            magnitudeB += b[i] * b[i];
         }
 
-        public async Task<SearchResult[]> Search(string input, string category, int topK)
-        {
-            logger.LogInformation("Starting search in category {Category} with input: {Input} and topK: {TopK}", category, input, topK);
-
-            var inputChunk = unchunkableFlatTextPreprocessor.Process(input).Chunks.Single();
-
-            var similarityResults = await PerformSimilaritySearch(inputChunk, category, topK);
-
-            var ids = similarityResults.Select(r => r.Id).ToArray();
-
-            var textResults = await dbInterface.GetEmbeddedTextByIds(ids);
-
-            var results = similarityResults
-                .Join(textResults, sim => sim.Id, text => text.Id,
-                    (sim, text) => new SearchResult(Text: text.Text, SimilarityScore: sim.SimilarityScore, Id: sim.Id, Category: text.Category, Filename: text.Filename))
-                .ToArray();
-
-            return results;
-        }
-
-        private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, string category, int topK)
-        {
-            var queryVector = embeddingsService.GenerateEmbeddings(input);
-
-            logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
-
-            var vectors = await dbInterface.GetVectorsForCategory(category);
-
-            logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
-
-            var similarities = vectors
-                .Select(v => new { v.Id, Similarity = CosineSimilarity(queryVector, v.Vector) })
-                .OrderByDescending(x => x.Similarity)
-                .Take(topK)
-                .Select(x => new SimilarityResult(Id: x.Id, SimilarityScore: x.Similarity))
-                .ToArray();
-
-            logger.LogInformation("Similarity search completed. Top {TopK} IDs: {Ids}", topK, similarities);
-
-            return similarities;
-        }
-
-        private static float CosineSimilarity(float[] a, float[] b)
-        {
-            if (a.Length != b.Length) return 0;
-
-            float dotProduct = 0;
-            float magnitudeA = 0;
-            float magnitudeB = 0;
-
-            for (int i = 0; i < a.Length; i++)
-            {
-                dotProduct += a[i] * b[i];
-                magnitudeA += a[i] * a[i];
-                magnitudeB += b[i] * b[i];
-            }
-
-            float magnitude = MathF.Sqrt(magnitudeA) * MathF.Sqrt(magnitudeB);
-            return magnitude == 0 ? 0 : dotProduct / magnitude;
-        }
+        float magnitude = MathF.Sqrt(magnitudeA) * MathF.Sqrt(magnitudeB);
+        return magnitude == 0 ? 0 : dotProduct / magnitude;
     }
 }
