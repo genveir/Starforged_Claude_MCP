@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Cat;
 

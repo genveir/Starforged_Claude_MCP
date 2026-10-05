@@ -1,10 +1,9 @@
 using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
-using StarForged_Claude_MCP.Embeddings.Services.Models;
+using StarForged_Claude_MCP.Database.Models;
 
-namespace StarForged_Claude_MCP.Embeddings.Database;
+namespace StarForged_Claude_MCP.Database;
 
 public class DbInterface
 {
@@ -160,7 +159,7 @@ public class DbInterface
 
     // ---------- Embeddings ----------
 
-    internal async Task<int> WriteEmbedding(Chunk chunk, float[] vector, int documentId)
+    public async Task<int> WriteEmbedding(string text, int tokenCount, float[] vector, int documentId)
     {
         using var connection = new SqlConnection(_connectionString);
         return await connection.QuerySingleAsync<int>(
@@ -169,7 +168,7 @@ public class DbInterface
             output inserted.Id
             values (@DocumentId, @Text, @Vector, @TokenCount)
             """,
-            new { DocumentId = documentId, Text = chunk.Text, Vector = FloatsToBytes(vector), TokenCount = chunk.Tokens.Length });
+            new { DocumentId = documentId, Text = text, Vector = FloatsToBytes(vector), TokenCount = tokenCount });
     }
 
     public async Task DeleteEmbeddingsForDocument(int documentId)
@@ -197,7 +196,7 @@ public class DbInterface
     /// <summary>
     /// The vectors of every indexed document in <paramref name="category"/> or any category under it.
     /// </summary>
-    internal async Task<List<VectorResult>> GetVectorsForCategory(string category)
+    public async Task<List<VectorResult>> GetVectorsForCategory(string category)
     {
         using var connection = new SqlConnection(_connectionString);
         var results = await connection.QueryAsync<dynamic>(

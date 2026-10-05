@@ -1,7 +1,7 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 
-namespace StarForged_Claude_MCP.Tests.Embeddings;
+namespace StarForged_Claude_MCP.Tests.Database;
 
 public class CategoryPathTests
 {

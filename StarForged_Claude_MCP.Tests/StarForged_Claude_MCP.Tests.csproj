@@ -24,6 +24,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\StarForged_Claude_MCP.ConsoleAccess\StarForged_Claude_MCP.ConsoleAccess.csproj" />
+		<ProjectReference Include="..\StarForged_Claude_MCP.Database\StarForged_Claude_MCP.Database.csproj" />
 		<ProjectReference Include="..\StarForged_Claude_MCP.Server\StarForged_Claude_MCP.Server.csproj" />
 	</ItemGroup>
 

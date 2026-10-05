@@ -1,5 +1,5 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Server.Services;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;

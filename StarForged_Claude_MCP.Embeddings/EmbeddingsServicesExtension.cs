@@ -1,5 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using StarForged_Claude_MCP.Embeddings.Database;
+using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
@@ -14,8 +13,6 @@ namespace StarForged_Claude_MCP.Embeddings
             services.AddSingleton<IDocumentProcessingService, DocumentProcessingService>();
             services.AddSingleton<ISearchService, SearchService>();
             services.AddSingleton<EmbeddingsService>();
-            services.AddSingleton<DbInterface>();
-
             return services;
         }
     }

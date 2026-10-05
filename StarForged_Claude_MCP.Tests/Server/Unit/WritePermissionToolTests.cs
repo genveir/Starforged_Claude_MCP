@@ -1,6 +1,6 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Moq;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Ironsworn.Dice;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;

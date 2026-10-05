@@ -1,4 +1,4 @@
-namespace StarForged_Claude_MCP.Embeddings.Database.Models;
+namespace StarForged_Claude_MCP.Database.Models;
 
 public class VectorResult
 {

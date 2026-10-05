@@ -7,7 +7,7 @@ using StarForged_Claude_MCP.ConsoleAccess.List;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings;
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 
 namespace StarForged_Claude_MCP.ConsoleAccess;
 
@@ -79,6 +79,7 @@ public class Program
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
         services.AddSingleton<IIndexPrompt, ConsoleIndexPrompt>();
         services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
+        services.AddDatabaseServices();
         services.AddEmbeddingsServices();
     }
 

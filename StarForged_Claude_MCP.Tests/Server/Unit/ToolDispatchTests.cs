@@ -1,7 +1,7 @@
-﻿using FluentAssertions;
+using FluentAssertions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Ironsworn.Abstractions;
 using StarForged_Claude_MCP.Ironsworn.Dice;

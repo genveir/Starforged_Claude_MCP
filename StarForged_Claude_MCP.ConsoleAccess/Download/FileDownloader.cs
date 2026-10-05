@@ -1,5 +1,5 @@
-using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Models;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 

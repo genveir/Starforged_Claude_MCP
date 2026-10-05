@@ -1,5 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 

@@ -1,5 +1,5 @@
-using StarForged_Claude_MCP.Embeddings.Database;
-using StarForged_Claude_MCP.Embeddings.Database.Models;
+using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Server.Services.Abstractions;

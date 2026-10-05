@@ -1,10 +1,10 @@
 using System.Text.RegularExpressions;
 
-namespace StarForged_Claude_MCP.Embeddings.Database;
+namespace StarForged_Claude_MCP.Database;
 
 public static class DatabaseSchema
 {
-    private const string ResourceName = "StarForged_Claude_MCP.Embeddings.Database.CreateScript.sql";
+    private const string ResourceName = "StarForged_Claude_MCP.Database.CreateScript.sql";
 
     private static readonly Regex BatchSeparator =
         new(@"^\s*go\s*$", RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);

@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
 
 namespace StarForged_Claude_MCP.Embeddings.Services
@@ -52,7 +52,11 @@ namespace StarForged_Claude_MCP.Embeddings.Services
             foreach (var chunk in preprocessedText.Chunks)
             {
                 var embedding = embeddingsService.GenerateEmbeddings(chunk);
-                storedChunkIds.Add(await dbInterface.WriteEmbedding(chunk, embedding, documentId));
+                storedChunkIds.Add(await dbInterface.WriteEmbedding(
+                    text: chunk.Text,
+                    tokenCount: chunk.Tokens.Length,
+                    vector: embedding,
+                    documentId: documentId));
             }
 
             return [.. storedChunkIds];

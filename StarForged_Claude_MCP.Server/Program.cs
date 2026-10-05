@@ -1,10 +1,10 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
 using StarForged_Claude_MCP.Embeddings;
-using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Database;
 using StarForged_Claude_MCP.Ironsworn.Abstractions;
 using StarForged_Claude_MCP.Ironsworn.Dice;
 using StarForged_Claude_MCP.Server.Services;
@@ -48,6 +48,7 @@ public class Program
         builder.Logging.ClearProviders();
         builder.Services.AddSerilog(Log.Logger, dispose: true);
 
+        builder.Services.AddDatabaseServices();
         builder.Services.AddEmbeddingsServices();
 
         builder.Services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();

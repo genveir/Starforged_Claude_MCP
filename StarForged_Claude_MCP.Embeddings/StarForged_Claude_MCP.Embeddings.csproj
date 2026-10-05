@@ -8,9 +8,6 @@
 
 	<ItemGroup>
 		<PackageReference Include="BERTTokenizers" Version="1.2.0" />
-		<PackageReference Include="Dapper" Version="2.1.72" />
-		<PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
-		<PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.5" />
 		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.5" />
@@ -24,11 +21,11 @@
 		</ItemGroup>
 
 	<ItemGroup>
-		<EmbeddedResource Include="Database\CreateScript.sql" />
+		<InternalsVisibleTo Include="StarForged_Claude_MCP.Tests" />
 	</ItemGroup>
 
 	<ItemGroup>
-		<InternalsVisibleTo Include="StarForged_Claude_MCP.Tests" />
+		<ProjectReference Include="..\StarForged_Claude_MCP.Database\StarForged_Claude_MCP.Database.csproj" />
 	</ItemGroup>
 
 </Project>

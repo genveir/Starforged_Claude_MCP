@@ -1,4 +1,4 @@
-namespace StarForged_Claude_MCP.Embeddings.Database;
+namespace StarForged_Claude_MCP.Database;
 
 /// <summary>
 /// Categories form a tree written as dotted paths: 'Campaign.Oracles' is a subcategory of 'Campaign'. There is
