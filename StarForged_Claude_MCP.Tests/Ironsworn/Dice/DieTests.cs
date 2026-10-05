@@ -1,7 +1,7 @@
 using FluentAssertions;
-using StarForged_Claude_MCP.Server.Services;
+using StarForged_Claude_MCP.Ironsworn.Dice;
 
-namespace StarForged_Claude_MCP.Tests.Server.Unit;
+namespace StarForged_Claude_MCP.Tests.Ironsworn.Dice;
 
 public class DieTests
 {

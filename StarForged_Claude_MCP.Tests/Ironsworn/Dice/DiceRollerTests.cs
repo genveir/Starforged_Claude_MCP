@@ -1,7 +1,8 @@
 using FluentAssertions;
+using StarForged_Claude_MCP.Ironsworn.Dice;
 using StarForged_Claude_MCP.Server.Services;
 
-namespace StarForged_Claude_MCP.Tests.Server.Unit;
+namespace StarForged_Claude_MCP.Tests.Ironsworn.Dice;
 
 public class DiceRollerTests
 {

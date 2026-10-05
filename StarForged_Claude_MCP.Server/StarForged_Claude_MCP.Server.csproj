@@ -16,6 +16,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\StarForged_Claude_MCP.Embeddings\StarForged_Claude_MCP.Embeddings.csproj" />
+		<ProjectReference Include="..\StarForged_Claude_MCP.Ironsworn\StarForged_Claude_MCP.Ironsworn.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
@@ -25,9 +26,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Content Include="..\skill\**\*.*"
-				 Link="skill\%(RecursiveDir)%(Filename)%(Extension)"
-				 CopyToOutputDirectory="PreserveNewest" />
+		<Content Include="..\skill\**\*.*" Link="skill\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
 	</ItemGroup>
 
 	<ItemGroup>

@@ -3,9 +3,10 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using StarForged_Claude_MCP.Embeddings.Database.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
+using StarForged_Claude_MCP.Ironsworn.Abstractions;
+using StarForged_Claude_MCP.Ironsworn.Dice;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Models;
-using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
 using StarForged_Claude_MCP.Server.Tools.Abstractions;
 

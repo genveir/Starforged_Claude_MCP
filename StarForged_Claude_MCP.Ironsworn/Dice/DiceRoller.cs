@@ -1,7 +1,6 @@
-using StarForged_Claude_MCP.Server.Models;
-using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Ironsworn.Abstractions;
 
-namespace StarForged_Claude_MCP.Server.Services;
+namespace StarForged_Claude_MCP.Ironsworn.Dice;
 
 public class DiceRoller : IDiceRoller
 {

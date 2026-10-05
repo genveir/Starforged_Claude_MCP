@@ -1,6 +1,6 @@
-using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Ironsworn.Abstractions;
 
-namespace StarForged_Claude_MCP.Tests.Server.Unit;
+namespace StarForged_Claude_MCP.Tests.Ironsworn.Dice;
 
 /// <summary>
 /// A die that rolls the values it was given, in order, so a roll can be set up exactly.

@@ -1,4 +1,4 @@
-namespace StarForged_Claude_MCP.Server.Models;
+namespace StarForged_Claude_MCP.Ironsworn.Dice;
 
 public record ActionRollResult(
     int ActionDie,

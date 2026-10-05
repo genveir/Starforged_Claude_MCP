@@ -4,6 +4,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Embeddings.Database;
+using StarForged_Claude_MCP.Ironsworn.Abstractions;
+using StarForged_Claude_MCP.Ironsworn.Dice;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
