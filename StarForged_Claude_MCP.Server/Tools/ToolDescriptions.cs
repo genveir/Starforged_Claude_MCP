@@ -2,7 +2,7 @@ namespace StarForged_Claude_MCP.Server.Tools;
 
 /// <summary>
 /// Argument descriptions that several tools share word for word, so that the model reads one account of
-/// categories, sections, summaries, campaigns, meters and tracks whichever tool it is looking at.
+/// categories, sections, summaries, campaigns, meters, tracks and impacts whichever tool it is looking at.
 /// </summary>
 public static class ToolDescriptions
 {
@@ -37,6 +37,14 @@ public static class ToolDescriptions
         "The track's id: its kind and a name joined by a dot, e.g. 'vow.handle-the-plantation'. Kinds are vow, " +
         "connection, expedition and combat; the name is letters, digits and hyphens. Matched ignoring case; the track " +
         "keeps the casing it was created with.";
+
+    public const string ImpactEntity =
+        "What carries the impact: 'character', a vehicle such as 'jorran-hasfer', or a module such as 'research-lab'. " +
+        "Letters, digits and hyphens with at most one dot; matched ignoring case.";
+
+    public const string ImpactName =
+        "The impact's name, e.g. 'wounded', 'permanently harmed' or 'broken': any text up to 100 characters. Matched " +
+        "ignoring case; an impact keeps the casing it was marked with.";
 
     /// <summary>The section argument of a tool that acts on exactly one section, e.g. "replace" or "delete".</summary>
     public static string Section(string action) =>

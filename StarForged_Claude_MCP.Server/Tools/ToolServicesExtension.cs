@@ -35,6 +35,8 @@ public static class ToolServicesExtension
         services.AddSingleton<ITool, CreateTrackTool>();
         services.AddSingleton<ITool, EditTrackTool>();
         services.AddSingleton<ITool, RemoveTrackTool>();
+        services.AddSingleton<ITool, GetImpactsTool>();
+        services.AddSingleton<ITool, SetImpactTool>();
         services.AddSingleton<ITool, RequestWritePermissionTool>();
         services.AddSingleton<ITool, ReleaseWritePermissionTool>();
 

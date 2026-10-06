@@ -14,6 +14,7 @@ public static class DatabaseServicesExtension
         services.AddSingleton<CampaignRepository>();
         services.AddSingleton<MeterRepository>();
         services.AddSingleton<TrackRepository>();
+        services.AddSingleton<ImpactRepository>();
 
         return services;
     }

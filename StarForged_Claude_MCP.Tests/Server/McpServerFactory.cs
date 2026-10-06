@@ -19,7 +19,8 @@ internal static class McpServerFactory
         IDiceRoller diceRoller,
         IWritePermissions writePermissions,
         IMeterService? meters = null,
-        ITrackService? tracks = null)
+        ITrackService? tracks = null,
+        IImpactService? impacts = null)
     {
         var services = new ServiceCollection();
 
@@ -30,6 +31,7 @@ internal static class McpServerFactory
         services.AddSingleton(writePermissions);
         services.AddSingleton(meters ?? new Mock<IMeterService>(MockBehavior.Strict).Object);
         services.AddSingleton(tracks ?? new Mock<ITrackService>(MockBehavior.Strict).Object);
+        services.AddSingleton(impacts ?? new Mock<IImpactService>(MockBehavior.Strict).Object);
         services.AddMcpTools();
         services.AddSingleton<McpServer>();
 
