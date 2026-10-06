@@ -1,6 +1,8 @@
+using StarForged_Claude_MCP.Shared.DomainTypes;
+
 namespace StarForged_Claude_MCP.ConsoleAccess.List;
 
-public record ListOptions(string? Category) : IConsoleAccessOptions
+public record ListOptions(Category? Category) : IConsoleAccessOptions
 {
     public static ListOptions? Parse(string[] args)
     {
@@ -23,7 +25,13 @@ public record ListOptions(string? Category) : IConsoleAccessOptions
             return null;
         }
 
-        return new ListOptions(args[0]);
+        if (!CategoryArgument.TryTake(args, out var category, out _))
+        {
+            PrintUsage();
+            return null;
+        }
+
+        return new ListOptions(category);
     }
 
     public static void PrintUsage()

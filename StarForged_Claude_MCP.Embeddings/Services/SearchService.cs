@@ -1,13 +1,15 @@
 ﻿using Microsoft.Extensions.Logging;
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Embeddings.Services.Preprocessing;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.Embeddings.Services;
 
 public interface ISearchService
 {
-    Task<SearchResult[]> Search(string input, string category, int topK);
+    Task<SearchResult[]> Search(string input, Category category, int topK);
 }
 
 internal class SearchService : ISearchService
@@ -28,7 +30,7 @@ internal class SearchService : ISearchService
         this.logger = logger;
     }
 
-    public async Task<SearchResult[]> Search(string input, string category, int topK)
+    public async Task<SearchResult[]> Search(string input, Category category, int topK)
     {
         logger.LogInformation("Starting search in category {Category} with input: {Input} and topK: {TopK}", category, input, topK);
 
@@ -48,13 +50,13 @@ internal class SearchService : ISearchService
         return results;
     }
 
-    private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, string category, int topK)
+    private async Task<SimilarityResult[]> PerformSimilaritySearch(Chunk input, Category category, int topK)
     {
         var queryVector = embeddingsService.GenerateEmbeddings(input);
 
         logger.LogDebug("Query vector for input: {QueryVector}", queryVector);
 
-        var vectors = await embeddings.GetVectorsForCategory(category);
+        var vectors = await embeddings.GetVectorsForCategory(category.ToCategoryPath());
 
         logger.LogDebug("Vector count on similarity search in category {Category}: {VectorCount}", category, vectors.Count);
 

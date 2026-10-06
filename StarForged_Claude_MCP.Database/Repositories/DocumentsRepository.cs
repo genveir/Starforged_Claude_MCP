@@ -1,6 +1,6 @@
 using Dapper;
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Models;
-using StarForged_Claude_MCP.Database.Util;
 
 namespace StarForged_Claude_MCP.Database.Repositories;
 
@@ -16,7 +16,7 @@ public class DocumentsRepository
     private const string IndexedColumn =
         "cast(case when exists (select 1 from Embeddings e where e.DocumentId = d.Id) then 1 else 0 end as bit) as Indexed";
 
-    public async Task<int> StoreDocument(string category, string filename, string content, string? summary)
+    public async Task<int> StoreDocument(CategoryPath category, string filename, string content, string? summary)
     {
         using var connection = _connections.Create();
         return await connection.QuerySingleAsync<int>(
@@ -25,34 +25,34 @@ public class DocumentsRepository
             output inserted.Id
             values (@Category, @Filename, @Content, @Summary)
             """,
-            new { Category = category, Filename = filename, Content = content, Summary = summary });
+            new { Category = category.Value, Filename = filename, Content = content, Summary = summary });
     }
 
-    public async Task<Document?> GetDocument(string category, string filename)
+    public async Task<Document?> GetDocument(CategoryPath category, string filename)
     {
         using var connection = _connections.Create();
         return await connection.QuerySingleOrDefaultAsync<Document>(
             $"select d.Id, d.Category, d.Filename, d.Content, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category and d.Filename = @Filename",
-            new { Category = category, Filename = filename });
+            new { Category = category.Value, Filename = filename });
     }
 
-    public async Task<DocumentIndexEntry?> GetDocumentSummary(string category, string filename)
+    public async Task<DocumentIndexEntry?> GetDocumentSummary(CategoryPath category, string filename)
     {
         using var connection = _connections.Create();
         return await connection.QuerySingleOrDefaultAsync<DocumentIndexEntry>(
             $"select d.Filename, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category and d.Filename = @Filename",
-            new { Category = category, Filename = filename });
+            new { Category = category.Value, Filename = filename });
     }
 
-    public async Task<List<DocumentIndexEntry>> GetDocumentIndex(string category)
+    public async Task<List<DocumentIndexEntry>> GetDocumentIndex(CategoryPath category)
     {
         using var connection = _connections.Create();
         var results = await connection.QueryAsync<DocumentIndexEntry>(
             $"select d.Filename, d.Summary, {IndexedColumn} " +
             "from Documents d where d.Category = @Category order by d.Filename",
-            new { Category = category });
+            new { Category = category.Value });
         return results.ToList();
     }
 
@@ -62,12 +62,12 @@ public class DocumentsRepository
     /// by anything, not just whitespace, so the caller still has to find the actual matches in the content
     /// that comes back.
     /// </summary>
-    public async Task<List<Document>> FindDocumentsContaining(string category, string text, string? filename)
+    public async Task<List<Document>> FindDocumentsContaining(CategoryPath category, string text, string? filename)
     {
         var words = text.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Select(EscapeLike);
         var pattern = $"%{string.Join("%", words)}%";
 
-        var parameters = CategoryPath.InScopeParameters(category);
+        var parameters = category.InScopeParameters();
         parameters.Add("Filename", filename);
         parameters.Add("Pattern", pattern);
 
@@ -102,21 +102,21 @@ public class DocumentsRepository
     /// The categories holding documents anywhere under <paramref name="category"/>, not counting itself.
     /// Empty for a leaf, and for a category that does not exist yet.
     /// </summary>
-    public async Task<List<string>> GetCategoriesUnder(string category)
+    public async Task<List<string>> GetCategoriesUnder(CategoryPath category)
     {
         using var connection = _connections.Create();
         var results = await connection.QueryAsync<string>(
             "select distinct d.Category from Documents d where left(d.Category, len(@Prefix)) = @Prefix order by d.Category",
-            new { Prefix = CategoryPath.DescendantPrefix(category) });
+            new { Prefix = category.DescendantPrefix() });
         return results.ToList();
     }
 
     /// <summary>
     /// The categories above <paramref name="category"/> that hold documents themselves, nearest the root first.
     /// </summary>
-    public async Task<List<string>> GetAncestorsHoldingDocuments(string category)
+    public async Task<List<string>> GetAncestorsHoldingDocuments(CategoryPath category)
     {
-        var ancestors = CategoryPath.Ancestors(category);
+        var ancestors = category.Ancestors();
         if (ancestors.Count == 0) return [];
 
         using var connection = _connections.Create();

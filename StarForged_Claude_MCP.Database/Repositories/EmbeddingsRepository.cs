@@ -1,6 +1,6 @@
 using Dapper;
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Models;
-using StarForged_Claude_MCP.Database.Util;
 
 namespace StarForged_Claude_MCP.Database.Repositories;
 
@@ -50,7 +50,7 @@ public class EmbeddingsRepository
     /// <summary>
     /// The vectors of every indexed document in <paramref name="category"/> or any category under it.
     /// </summary>
-    public async Task<List<VectorResult>> GetVectorsForCategory(string category)
+    public async Task<List<VectorResult>> GetVectorsForCategory(CategoryPath category)
     {
         using var connection = _connections.Create();
         var results = await connection.QueryAsync<dynamic>(
@@ -60,7 +60,7 @@ public class EmbeddingsRepository
             join Documents d on d.Id = e.DocumentId
             where {CategoryPath.InScopeSql}
             """,
-            CategoryPath.InScopeParameters(category));
+            category.InScopeParameters());
 
         return results.Select(r => new VectorResult
         {

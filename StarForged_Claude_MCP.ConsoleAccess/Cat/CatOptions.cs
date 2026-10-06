@@ -1,16 +1,18 @@
+using StarForged_Claude_MCP.Shared.DomainTypes;
+
 namespace StarForged_Claude_MCP.ConsoleAccess.Cat;
 
-public record CatOptions(string Category, string Filename) : IConsoleAccessOptions
+public record CatOptions(Category Category, string Filename) : IConsoleAccessOptions
 {
     public static CatOptions? Parse(string[] args)
     {
-        if (args.Length != 2)
+        if (args.Length != 2 || !CategoryArgument.TryTake(args, out var category, out var rest))
         {
             PrintUsage();
             return null;
         }
 
-        return new CatOptions(args[0], args[1]);
+        return new CatOptions(category, rest[0]);
     }
 
     public static void PrintUsage()

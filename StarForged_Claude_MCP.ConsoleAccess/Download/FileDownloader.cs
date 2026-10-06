@@ -1,6 +1,7 @@
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Database.Repositories;
-using StarForged_Claude_MCP.Database.Util;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
@@ -47,7 +48,7 @@ public class FileDownloader
     /// <see cref="Verbosity.Changed"/> the files left unchanged are counted but not listed.
     /// </summary>
     private async Task DownloadFolderAsync(
-        string category, string folderPath, bool overwrite, bool clean, bool dryRun, Verbosity verbosity)
+        Category category, string folderPath, bool overwrite, bool clean, bool dryRun, Verbosity verbosity)
     {
         var leaves = await PlanFolderAsync(category, folderPath);
         if (leaves.Count == 0)
@@ -89,22 +90,25 @@ public class FileDownloader
         }
     }
 
-    private async Task<List<LeafDownload>> PlanFolderAsync(string category, string folderPath)
+    private async Task<List<LeafDownload>> PlanFolderAsync(Category category, string folderPath)
     {
-        var leaves = await documents.GetCategoriesUnder(category);
+        var leaves = (await documents.GetCategoriesUnder(category.ToCategoryPath()))
+            .Select(path => new Category(path))
+            .ToList();
+
         if (leaves.Count == 0)
         {
-            var index = await documents.GetDocumentIndex(category);
+            var index = await documents.GetDocumentIndex(category.ToCategoryPath());
             return index.Count == 0 ? [] : [new LeafDownload(category, folderPath, index)];
         }
 
         var plan = new List<LeafDownload>();
         foreach (var leaf in leaves)
         {
-            var relativeSegments = leaf[(category.Length + 1)..].Split(CategoryPath.Separator).Select(SanitiseFileName);
+            var relativeSegments = leaf.ToString()[(category.ToString().Length + 1)..].Split('.').Select(SanitiseFileName);
             var leafFolder = Path.Combine([folderPath, .. relativeSegments]);
 
-            plan.Add(new LeafDownload(leaf, leafFolder, await documents.GetDocumentIndex(leaf)));
+            plan.Add(new LeafDownload(leaf, leafFolder, await documents.GetDocumentIndex(leaf.ToCategoryPath())));
         }
 
         return plan;
@@ -272,7 +276,7 @@ public class FileDownloader
         {
             var path = leaf.PathFor(entry);
 
-            var document = await documents.GetDocument(leaf.Category, entry.Filename);
+            var document = await documents.GetDocument(leaf.Category.ToCategoryPath(), entry.Filename);
             if (document == null) continue;
 
             var existing = await CompareWithExistingAsync(path, document.Content);
@@ -317,9 +321,9 @@ public class FileDownloader
         }
     }
 
-    private async Task DownloadDocumentAsync(string category, string filename, string targetPath, bool overwrite, bool dryRun)
+    private async Task DownloadDocumentAsync(Category category, string filename, string targetPath, bool overwrite, bool dryRun)
     {
-        var document = await documents.GetDocument(category, filename);
+        var document = await documents.GetDocument(category.ToCategoryPath(), filename);
 
         if (document == null)
         {
@@ -391,7 +395,7 @@ public class FileDownloader
         return string.IsNullOrWhiteSpace(sanitised) ? "untitled" : sanitised;
     }
 
-    private sealed record LeafDownload(string Category, string Folder, List<DocumentIndexEntry> Index)
+    private sealed record LeafDownload(Category Category, string Folder, List<DocumentIndexEntry> Index)
     {
         public string PathFor(DocumentIndexEntry entry) => Path.Combine(Folder, SanitiseFileName(entry.Filename));
     }

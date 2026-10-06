@@ -1,7 +1,8 @@
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Models;
 using StarForged_Claude_MCP.Database.Repositories;
-using StarForged_Claude_MCP.Database.Util;
 using StarForged_Claude_MCP.Embeddings.Services;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
@@ -64,7 +65,7 @@ public class FileUploader
     /// folder is checked before anything is written, so a folder that breaks the category hierarchy stores nothing.
     /// </summary>
     private async Task UploadFolderAsync(
-        string category, string folderPath, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity)
+        Category category, string folderPath, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity)
     {
         var leaves = new List<LeafUpload>();
         if (!TryPlanFolder(category, folderPath, leaves)) return;
@@ -103,7 +104,7 @@ public class FileUploader
     /// every subfolder whose name does not start with a period. Subfolders without any .md files in them are
     /// ignored. Reports the first folder that cannot become a category on stderr and returns false.
     /// </summary>
-    private static bool TryPlanFolder(string category, string folderPath, List<LeafUpload> leaves)
+    private static bool TryPlanFolder(Category category, string folderPath, List<LeafUpload> leaves)
     {
         var leavesBefore = leaves.Count;
 
@@ -114,17 +115,18 @@ public class FileUploader
         foreach (var subfolder in subfolders)
         {
             var name = Path.GetFileName(subfolder);
-            var leavesBeforeSubfolder = leaves.Count;
 
-            if (!TryPlanFolder($"{category}{CategoryPath.Separator}{name}", subfolder, leaves)) return false;
-
-            var becomesCategory = leaves.Count > leavesBeforeSubfolder;
-            if (becomesCategory && (name.Contains(CategoryPath.Separator) || !CategoryPath.IsWellFormed(name)))
+            // Checked before descending, since a malformed name cannot become a Category to descend with.
+            if (name.Contains('.') || !Category.IsWellFormed(name))
             {
+                if (!HoldsMarkdownFiles(subfolder)) continue;
+
                 Console.Error.WriteLine(
-                    $"Error: the folder '{subfolder}' cannot be a category; its name may not contain '{CategoryPath.Separator}'.");
+                    $"Error: the folder '{subfolder}' cannot be a category; its name may not contain '.'.");
                 return false;
             }
+
+            if (!TryPlanFolder(new($"{category}.{name}"), subfolder, leaves)) return false;
         }
 
         var files = Directory.GetFiles(folderPath, "*.md");
@@ -143,6 +145,16 @@ public class FileUploader
     }
 
     /// <summary>
+    /// Whether <see cref="TryPlanFolder"/> would make a category of this folder: it or a subfolder not starting
+    /// with a period holds .md files.
+    /// </summary>
+    private static bool HoldsMarkdownFiles(string folderPath) =>
+        Directory.GetFiles(folderPath, "*.md").Length > 0 ||
+        Directory.GetDirectories(folderPath)
+            .Where(subfolder => !Path.GetFileName(subfolder).StartsWith('.'))
+            .Any(HoldsMarkdownFiles);
+
+    /// <summary>
     /// Stores <paramref name="files"/> under <paramref name="category"/>. With <paramref name="dryRun"/> nothing is
     /// written and nothing is asked: every question is taken as answered blank, and the report says what would change.
     /// Each file is reported once it has been handled, so any question about it comes before its line; with
@@ -150,7 +162,7 @@ public class FileUploader
     /// totals are reported only when something was stored or replaced, unless it is the outermost category of the upload.
     /// </summary>
     private async Task<UploadTally> UploadFilesAsync(
-        string category, string[] files, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity,
+        Category category, string[] files, IndexMode index, SummaryMode summaries, bool dryRun, Verbosity verbosity,
         bool isOutermost)
     {
         if (verbosity == Verbosity.All)
@@ -168,7 +180,7 @@ public class FileUploader
             var text = await File.ReadAllTextAsync(filePath);
             var filename = Path.GetFileName(filePath);
 
-            var existing = await documents.GetDocument(category, filename);
+            var existing = await documents.GetDocument(category.ToCategoryPath(), filename);
 
             // Asked for before anything is written, so that abandoning a run part way through
             // never leaves a document stored without the answers that were being typed for it.
@@ -253,9 +265,9 @@ public class FileUploader
         _ => throw new ArgumentException($"Unknown index mode {index}", nameof(index))
     };
 
-    private async Task<int> StoreDocumentAsync(string category, string filename, string content, string? summary, bool indexed)
+    private async Task<int> StoreDocumentAsync(Category category, string filename, string content, string? summary, bool indexed)
     {
-        var id = await documents.StoreDocument(category, filename, content, summary);
+        var id = await documents.StoreDocument(category.ToCategoryPath(), filename, content, summary);
 
         if (indexed)
         {
@@ -300,7 +312,7 @@ public class FileUploader
         return changes;
     }
 
-    private sealed record LeafUpload(string Category, string[] Files);
+    private sealed record LeafUpload(Category Category, string[] Files);
 
     private readonly record struct UploadTally(int Stored, int Replaced, int Unchanged, int SkippedQuestions)
     {

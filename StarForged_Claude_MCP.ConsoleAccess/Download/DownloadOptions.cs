@@ -1,9 +1,11 @@
+using StarForged_Claude_MCP.Shared.DomainTypes;
+
 namespace StarForged_Claude_MCP.ConsoleAccess.Download;
 
 public enum DownloadMode { Folder, Document }
 
 public record DownloadOptions(
-    string Category,
+    Category Category,
     string TargetPath,
     DownloadMode Mode,
     string? Filename = null,

@@ -1,3 +1,4 @@
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Repositories;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.Cat;
@@ -13,7 +14,7 @@ public class DocumentPrinter
 
     public async Task Print(CatOptions options)
     {
-        var document = await documents.GetDocument(options.Category, options.Filename);
+        var document = await documents.GetDocument(options.Category.ToCategoryPath(), options.Filename);
 
         if (document == null)
         {

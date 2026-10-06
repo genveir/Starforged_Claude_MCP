@@ -10,7 +10,7 @@ public class UploadOptionsTests
     public void Parse_WithoutIndexOrSummaries_ShouldAskOnlyForWhatIsNew()
     {
         UploadOptions.Parse(["lore", "--folder", @".\in"]).Should()
-            .Be(new UploadOptions("lore", UploadMode.Folder, @".\in", Index: IndexMode.New, Summaries: SummaryMode.Missing));
+            .Be(new UploadOptions(new("lore"), UploadMode.Folder, @".\in", Index: IndexMode.New, Summaries: SummaryMode.Missing));
     }
 
     [Theory]

@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.Server.Tools;
 
@@ -20,7 +21,7 @@ public class ToolGuards
         _logger = logger;
     }
 
-    public void RequireWriteEnabled(string category)
+    public void RequireWriteEnabled(Category category)
     {
         if (_writePermissions.IsWriteEnabled(category)) return;
 
@@ -33,7 +34,7 @@ public class ToolGuards
     /// Only a leaf holds documents, so a tool that names one document, lists them or writes them needs one.
     /// Refusing a parent outright says so, where letting it through would only report the document missing.
     /// </summary>
-    public async Task RequireLeafCategoryAsync(string category)
+    public async Task RequireLeafCategoryAsync(Category category)
     {
         var subcategories = await _documents.GetSubcategoriesAsync(category);
         if (subcategories.Count == 0) return;
@@ -43,7 +44,7 @@ public class ToolGuards
             $"no subcategories under it. The leaf categories under '{category}' are: {string.Join(", ", subcategories)}.");
     }
 
-    public async Task RequireNoAncestorHoldsDocumentsAsync(string category)
+    public async Task RequireNoAncestorHoldsDocumentsAsync(Category category)
     {
         var ancestors = await _documents.GetAncestorsHoldingDocumentsAsync(category);
         if (ancestors.Count == 0) return;
@@ -53,10 +54,10 @@ public class ToolGuards
             "holds either documents or subcategories, never both.");
     }
 
-    public static ArgumentException NoSuchDocument(string category, string filename) =>
+    public static ArgumentException NoSuchDocument(Category category, string filename) =>
         new($"No document named '{filename}' exists in category '{category}'.");
 
-    public static string RequireDocumentWasFound(bool found, string category, string filename, string message)
+    public static string RequireDocumentWasFound(bool found, Category category, string filename, string message)
     {
         if (!found)
             throw NoSuchDocument(category, filename);

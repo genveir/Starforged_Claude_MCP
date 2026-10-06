@@ -3,6 +3,7 @@ using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Embeddings.Services;
 using StarForged_Claude_MCP.Embeddings.Services.Models;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.Server.Services;
 
@@ -17,7 +18,7 @@ public class EmbeddingsFacade : IEmbeddingsFacade
         this.embeddings = embeddings;
     }
 
-    public async Task<SearchResult[]> SearchAsync(string query, string category, int topK = 3) =>
+    public async Task<SearchResult[]> SearchAsync(string query, Category category, int topK = 3) =>
         await searchService.Search(query, category, topK);
 
     public async Task<TextResult[]> RetrieveByIdsAsync(int[] ids)

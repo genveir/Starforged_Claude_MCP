@@ -31,7 +31,7 @@ public abstract class McpServerTestBase
     {
         var permissions = _fixture.Services.GetRequiredService<IWritePermissions>();
         foreach (var category in categories)
-            permissions.EnableWrite(category);
+            permissions.EnableWrite(new(category));
     }
 
     protected async Task<JsonRpcResponse> InvokeServerMethod(JsonRpcRequest request) =>

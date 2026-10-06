@@ -1,4 +1,4 @@
-using StarForged_Claude_MCP.Database.Util;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 using System.Text.Json;
 
 namespace StarForged_Claude_MCP.Server.Tools;
@@ -16,16 +16,11 @@ public class ToolArguments
         _arguments = arguments;
     }
 
-    public string RequireCategory()
+    public Category RequireCategory()
     {
         var category = RequireString("category", maxLength: 200);
 
-        if (!CategoryPath.IsWellFormed(category))
-            throw new ArgumentException(
-                $"Category '{category}' is not a well-formed category path: its levels are separated by '{CategoryPath.Separator}', " +
-                "and none of them can be empty or start or end with a space.");
-
-        return category;
+        return new Category(category);
     }
 
     public string RequireString(string key, int maxLength)

@@ -1,3 +1,5 @@
+using StarForged_Claude_MCP.Shared.DomainTypes;
+
 namespace StarForged_Claude_MCP.ConsoleAccess.Upload;
 
 public enum UploadMode { Folder, Document }
@@ -33,7 +35,7 @@ public enum IndexMode
 }
 
 public record UploadOptions(
-    string Category,
+    Category Category,
     UploadMode Mode,
     string SourcePath,
     IndexMode Index = IndexMode.New,

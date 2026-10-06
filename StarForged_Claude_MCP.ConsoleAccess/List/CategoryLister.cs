@@ -1,4 +1,6 @@
+using StarForged_Claude_MCP.Database.DomainTypes;
 using StarForged_Claude_MCP.Database.Repositories;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.ConsoleAccess.List;
 
@@ -39,9 +41,9 @@ public class CategoryLister
         }
     }
 
-    private async Task ListDocuments(string category)
+    private async Task ListDocuments(Category category)
     {
-        var index = await documents.GetDocumentIndex(category);
+        var index = await documents.GetDocumentIndex(category.ToCategoryPath());
 
         if (index.Count == 0)
         {

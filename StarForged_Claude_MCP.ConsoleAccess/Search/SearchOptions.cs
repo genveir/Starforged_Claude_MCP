@@ -1,8 +1,10 @@
+using StarForged_Claude_MCP.Shared.DomainTypes;
+
 namespace StarForged_Claude_MCP.ConsoleAccess.Search;
 
 public enum SearchOutputType { None, Brief, Full }
 
-public record SearchOptions(string Category, string SearchString, int TopK = 10) : IConsoleAccessOptions
+public record SearchOptions(Category Category, string SearchString, int TopK = 10) : IConsoleAccessOptions
 {
     public SearchOutputType OutputType { get; set; } = SearchOutputType.Full;
 

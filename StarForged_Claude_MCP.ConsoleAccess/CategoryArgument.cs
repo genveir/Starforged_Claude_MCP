@@ -1,12 +1,12 @@
-using StarForged_Claude_MCP.Database.Util;
+using StarForged_Claude_MCP.Shared.DomainTypes;
 
 namespace StarForged_Claude_MCP.ConsoleAccess;
 
 internal static class CategoryArgument
 {
-    public static bool TryTake(string[] args, out string category, out string[] rest)
+    public static bool TryTake(string[] args, out Category category, out string[] rest)
     {
-        category = string.Empty;
+        category = null!;
         rest = [];
 
         if (args.Length == 0 || string.IsNullOrWhiteSpace(args[0]) || args[0].StartsWith('-'))
@@ -15,14 +15,14 @@ internal static class CategoryArgument
             return false;
         }
 
-        if (!CategoryPath.IsWellFormed(args[0]))
+        if (!Category.IsWellFormed(args[0]))
         {
             Console.Error.WriteLine(
-                $"Error: '{args[0]}' is not a well-formed category: levels are separated by '{CategoryPath.Separator}' and none can be empty.");
+                $"Error: '{args[0]}' is not a well-formed category: levels are separated by '.' and none can be empty.");
             return false;
         }
 
-        category = args[0];
+        category = new(args[0]);
         rest = args[1..];
         return true;
     }

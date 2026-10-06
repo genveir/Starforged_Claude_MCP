@@ -10,14 +10,14 @@ public class DownloadOptionsTests
     public void Parse_Folder_ShouldTakeCategoryAndPathPositionally()
     {
         DownloadOptions.Parse(["lore", @".\out", "--folder"]).Should()
-            .Be(new DownloadOptions("lore", @".\out", DownloadMode.Folder));
+            .Be(new DownloadOptions(new("lore"), @".\out", DownloadMode.Folder));
     }
 
     [Fact]
     public void Parse_Document_ShouldTakeTheFilenameFromTheFlag()
     {
         DownloadOptions.Parse(["lore", "ship.md", "-d", "ship.md", "--overwrite"]).Should()
-            .Be(new DownloadOptions("lore", "ship.md", DownloadMode.Document, Filename: "ship.md", Overwrite: true));
+            .Be(new DownloadOptions(new("lore"), "ship.md", DownloadMode.Document, Filename: "ship.md", Overwrite: true));
     }
 
     [Fact]

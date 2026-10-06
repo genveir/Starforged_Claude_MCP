@@ -17,6 +17,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\StarForged_Claude_MCP.Database\StarForged_Claude_MCP.Database.csproj" />
+		<ProjectReference Include="..\StarForged_Claude_MCP.Shared\StarForged_Claude_MCP.Shared.csproj" />
 		<ProjectReference Include="..\StarForged_Claude_MCP.Embeddings\StarForged_Claude_MCP.Embeddings.csproj" />
 	</ItemGroup>
 
