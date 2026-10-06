@@ -19,7 +19,7 @@ public class CreateCheckpointTool : ITool
     public Tool Definition { get; } = new()
     {
         Name = "create_checkpoint",
-        Description = "Saves a copy of all of the campaign's meters, tracks and impacts under a name. Make one at the start of every session, named after the session number, e.g. 'session-7'. A checkpoint with the same name is overwritten. Returns {\"checkpoint\": name}. tag::ironsworn::checkpoints",
+        Description = "Saves a copy of all of the campaign's meters, tracks and impacts under a name. A checkpoint with the same name is overwritten. Returns {\"checkpoint\": name}. tag::ironsworn::checkpoints",
         InputSchema = new
         {
             type = "object",
