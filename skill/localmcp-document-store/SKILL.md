@@ -59,4 +59,7 @@ Every localMCP tool description ends with `tag::<tag>`, which groups the tools b
 - **tag::document-lifecycle**: `add_document`, `update_document`, `archive_document`
 - **tag::section-editing**: `append_to_document`, `replace_document_section`, `replace_section_text`, `delete_document_section`
 - **tag::authorization**: `request_write_permission`, `release_write_permission`
-- **tag::ironsworn**: `roll_dice`
+- **tag::ironsworn::dice**: `roll_dice`
+- **tag::ironsworn::meters**: `get_meters`, `create_meter`, `update_meter`, `remove_meter`
+- **tag::ironsworn::tracks**: `get_tracks`, `create_track`, `update_track`, `edit_track`, `remove_track`
+- **tag::ironsworn::impacts**: `get_impacts`, `set_impact`

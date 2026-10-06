@@ -1,6 +1,7 @@
 using FluentAssertions;
 using StarForged_Claude_MCP.Ironsworn.Errors;
 using StarForged_Claude_MCP.Server.Tools;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
 

@@ -1,5 +1,14 @@
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Server.Tools.Abstractions;
+using StarForged_Claude_MCP.Server.Tools.Authorization;
+using StarForged_Claude_MCP.Server.Tools.CoreAccess;
+using StarForged_Claude_MCP.Server.Tools.DocumentLifecycle;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn.Impacts;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn.Meters;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn.Tracks;
+using StarForged_Claude_MCP.Server.Tools.SectionEditing;
+using StarForged_Claude_MCP.Server.Tools.SemanticSearch;
 
 namespace StarForged_Claude_MCP.Server.Tools;
 
