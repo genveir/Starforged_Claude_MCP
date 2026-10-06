@@ -4,6 +4,7 @@ using StarForged_Claude_MCP.Server.Tools.Authorization;
 using StarForged_Claude_MCP.Server.Tools.CoreAccess;
 using StarForged_Claude_MCP.Server.Tools.DocumentLifecycle;
 using StarForged_Claude_MCP.Server.Tools.Ironsworn;
+using StarForged_Claude_MCP.Server.Tools.Ironsworn.Checkpoints;
 using StarForged_Claude_MCP.Server.Tools.Ironsworn.Impacts;
 using StarForged_Claude_MCP.Server.Tools.Ironsworn.Meters;
 using StarForged_Claude_MCP.Server.Tools.Ironsworn.Tracks;
@@ -46,6 +47,7 @@ public static class ToolServicesExtension
         services.AddSingleton<ITool, RemoveTrackTool>();
         services.AddSingleton<ITool, GetImpactsTool>();
         services.AddSingleton<ITool, SetImpactTool>();
+        services.AddSingleton<ITool, CreateCheckpointTool>();
         services.AddSingleton<ITool, RequestWritePermissionTool>();
         services.AddSingleton<ITool, ReleaseWritePermissionTool>();
 

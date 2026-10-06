@@ -10,5 +10,6 @@ public enum ErrorCode
     Track_Id_Needs_Kind,
     Track_Kind_Unknown,
     Track_Not_Found,
-    Track_Already_Exists
+    Track_Already_Exists,
+    Checkpoint_Not_Found
 }

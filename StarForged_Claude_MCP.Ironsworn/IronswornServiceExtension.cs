@@ -18,6 +18,7 @@ public static class IronswornServiceExtension
         services.AddSingleton<IMeterService, MeterService>();
         services.AddSingleton<ITrackService, TrackService>();
         services.AddSingleton<IImpactService, ImpactService>();
+        services.AddSingleton<ICheckpointService, CheckpointService>();
 
         return services;
     }

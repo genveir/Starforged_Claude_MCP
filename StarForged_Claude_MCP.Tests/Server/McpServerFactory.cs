@@ -20,7 +20,8 @@ internal static class McpServerFactory
         IWritePermissions writePermissions,
         IMeterService? meters = null,
         ITrackService? tracks = null,
-        IImpactService? impacts = null)
+        IImpactService? impacts = null,
+        ICheckpointService? checkpoints = null)
     {
         var services = new ServiceCollection();
 
@@ -32,6 +33,7 @@ internal static class McpServerFactory
         services.AddSingleton(meters ?? new Mock<IMeterService>(MockBehavior.Strict).Object);
         services.AddSingleton(tracks ?? new Mock<ITrackService>(MockBehavior.Strict).Object);
         services.AddSingleton(impacts ?? new Mock<IImpactService>(MockBehavior.Strict).Object);
+        services.AddSingleton(checkpoints ?? new Mock<ICheckpointService>(MockBehavior.Strict).Object);
         services.AddMcpTools();
         services.AddSingleton<McpServer>();
 

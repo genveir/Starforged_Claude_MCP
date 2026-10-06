@@ -15,6 +15,7 @@ public static class DatabaseServicesExtension
         services.AddSingleton<MeterRepository>();
         services.AddSingleton<TrackRepository>();
         services.AddSingleton<ImpactRepository>();
+        services.AddSingleton<CheckpointRepository>();
 
         return services;
     }

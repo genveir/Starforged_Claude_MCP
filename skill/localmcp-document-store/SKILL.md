@@ -63,3 +63,4 @@ Every localMCP tool description ends with `tag::<tag>`, which groups the tools b
 - **tag::ironsworn::meters**: `get_meters`, `create_meter`, `update_meter`, `remove_meter`
 - **tag::ironsworn::tracks**: `get_tracks`, `create_track`, `update_track`, `edit_track`, `remove_track`
 - **tag::ironsworn::impacts**: `get_impacts`, `set_impact`
+- **tag::ironsworn::checkpoints**: `create_checkpoint`

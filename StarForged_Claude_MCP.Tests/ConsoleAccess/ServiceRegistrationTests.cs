@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.ConsoleAccess;
 using StarForged_Claude_MCP.ConsoleAccess.Cat;
+using StarForged_Claude_MCP.ConsoleAccess.Checkpoints;
 using StarForged_Claude_MCP.ConsoleAccess.CreateCampaign;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
@@ -18,6 +19,8 @@ public class ServiceRegistrationTests
     [InlineData(typeof(DocumentPrinter))]
     [InlineData(typeof(Searcher))]
     [InlineData(typeof(CampaignCreator))]
+    [InlineData(typeof(CheckpointCreator))]
+    [InlineData(typeof(CheckpointRestorer))]
     [InlineData(typeof(ISummaryPrompt))]
     [InlineData(typeof(IIndexPrompt))]
     [InlineData(typeof(IConfirmPrompt))]

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Cat;
+using StarForged_Claude_MCP.ConsoleAccess.Checkpoints;
 using StarForged_Claude_MCP.ConsoleAccess.CreateCampaign;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.List;
@@ -9,6 +10,7 @@ using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
 using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Database;
+using StarForged_Claude_MCP.Ironsworn;
 
 namespace StarForged_Claude_MCP.ConsoleAccess;
 
@@ -49,6 +51,8 @@ public class Program
         var searcher = host.Services.GetRequiredService<Searcher>();
         var lister = host.Services.GetRequiredService<CategoryLister>();
         var campaignCreator = host.Services.GetRequiredService<CampaignCreator>();
+        var checkpointCreator = host.Services.GetRequiredService<CheckpointCreator>();
+        var checkpointRestorer = host.Services.GetRequiredService<CheckpointRestorer>();
 
         switch (options)
         {
@@ -70,6 +74,12 @@ public class Program
             case CreateCampaignOptions createCampaignOptions:
                 await campaignCreator.Create(createCampaignOptions);
                 break;
+            case CreateCheckpointOptions createCheckpointOptions:
+                await checkpointCreator.Create(createCheckpointOptions);
+                break;
+            case RestoreCheckpointOptions restoreCheckpointOptions:
+                await checkpointRestorer.Restore(restoreCheckpointOptions);
+                break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
     }
@@ -82,11 +92,14 @@ public class Program
         services.AddSingleton<Searcher>();
         services.AddSingleton<CategoryLister>();
         services.AddSingleton<CampaignCreator>();
+        services.AddSingleton<CheckpointCreator>();
+        services.AddSingleton<CheckpointRestorer>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
         services.AddSingleton<IIndexPrompt, ConsoleIndexPrompt>();
         services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
         services.AddDatabaseServices();
         services.AddEmbeddingsServices();
+        services.AddIronswornServices();
     }
 
     private static IConsoleAccessOptions? ParseOptions(string[] args)
@@ -105,6 +118,8 @@ public class Program
             "search" => SearchOptions.Parse(args.Skip(1).ToArray()),
             "list" => ListOptions.Parse(args.Skip(1).ToArray()),
             "create-campaign" => CreateCampaignOptions.Parse(args.Skip(1).ToArray()),
+            "create-checkpoint" => CreateCheckpointOptions.Parse(args.Skip(1).ToArray()),
+            "restore-checkpoint" => RestoreCheckpointOptions.Parse(args.Skip(1).ToArray()),
             _ => HandleInvalidCommand(args[0])
         };
 
@@ -128,6 +143,8 @@ public class Program
         Console.WriteLine("  .\\ConsoleAccess.exe list");
         Console.WriteLine("  .\\ConsoleAccess.exe list <category>");
         Console.WriteLine("  .\\ConsoleAccess.exe create-campaign <name>");
+        Console.WriteLine("  .\\ConsoleAccess.exe create-checkpoint <campaign> <name>");
+        Console.WriteLine("  .\\ConsoleAccess.exe restore-checkpoint <campaign> <name> [--yes]");
         Console.WriteLine();
     }
 

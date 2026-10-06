@@ -53,6 +53,7 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "remove_track",
             "get_impacts",
             "set_impact",
+            "create_checkpoint",
             "request_write_permission",
             "release_write_permission");
     }
