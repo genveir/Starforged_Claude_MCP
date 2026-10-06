@@ -3,10 +3,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Serilog;
-using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Database;
-using StarForged_Claude_MCP.Ironsworn.Abstractions;
-using StarForged_Claude_MCP.Ironsworn.Dice;
+using StarForged_Claude_MCP.Embeddings;
+using StarForged_Claude_MCP.Ironsworn;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
 using StarForged_Claude_MCP.Server.Tools;
@@ -49,15 +48,13 @@ public class Program
         builder.Services.AddSerilog(Log.Logger, dispose: true);
 
         builder.Services.AddDatabaseServices();
+        builder.Services.AddIronswornServices();
         builder.Services.AddEmbeddingsServices();
 
         builder.Services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
         builder.Services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
-        builder.Services.AddSingleton<IDiceRoller>(_ => new DiceRoller(
-            actionDie: new Die(sides: 6),
-            firstChallengeDie: new Die(sides: 10),
-            secondChallengeDie: new Die(sides: 10)));
         builder.Services.AddSingleton<IWritePermissions, WritePermissions>();
+
         builder.Services.AddMcpTools();
         builder.Services.AddSingleton<McpServer>();
 
