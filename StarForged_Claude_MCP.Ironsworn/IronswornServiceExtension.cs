@@ -15,6 +15,7 @@ public static class IronswornServiceExtension
             secondChallengeDie: new Die(sides: 10)));
 
         services.AddSingleton<CampaignResolver>();
+        services.AddSingleton<IMeterService, MeterService>();
 
         return services;
     }

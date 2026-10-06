@@ -12,6 +12,7 @@ public static class DatabaseServicesExtension
         services.AddSingleton<DocumentsRepository>();
         services.AddSingleton<EmbeddingsRepository>();
         services.AddSingleton<CampaignRepository>();
+        services.AddSingleton<MeterRepository>();
 
         return services;
     }

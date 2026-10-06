@@ -26,6 +26,10 @@ public static class ToolServicesExtension
         services.AddSingleton<ITool, GetDocumentSummaryTool>();
         services.AddSingleton<ITool, ListDocumentsTool>();
         services.AddSingleton<ITool, RollDiceTool>();
+        services.AddSingleton<ITool, GetMetersTool>();
+        services.AddSingleton<ITool, UpdateMeterTool>();
+        services.AddSingleton<ITool, CreateMeterTool>();
+        services.AddSingleton<ITool, RemoveMeterTool>();
         services.AddSingleton<ITool, RequestWritePermissionTool>();
         services.AddSingleton<ITool, ReleaseWritePermissionTool>();
 

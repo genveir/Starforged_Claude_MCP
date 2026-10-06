@@ -13,6 +13,17 @@ public static class StateToolErrors
         ErrorCode.Campaign_Not_Found => new ArgumentException(
             $"No campaign named '{arguments.RequireCampaign().Value}' exists. Campaigns are set up by the player " +
             "outside this server; check the campaign name you were given, and ask the player if it is right."),
+        ErrorCode.Meter_Not_Found => new ArgumentException(
+            $"No meter named '{MeterName(arguments)}' exists in campaign '{arguments.RequireCampaign().Value}'. " +
+            "get_meters lists the campaign's meters."),
+        ErrorCode.Meter_Already_Exists => new ArgumentException(
+            $"A meter named '{MeterName(arguments)}' already exists in campaign '{arguments.RequireCampaign().Value}'. " +
+            "Use update_meter to change its value, or remove_meter to remove it first."),
+        ErrorCode.Meter_Range_Invalid => new ArgumentException(
+            $"Max {arguments.OptionalInt("max")} is below min {arguments.RequireInt("min")}; a meter's max cannot be " +
+            "lower than its min."),
         _ => throw new InvalidOperationException($"Error code {code} has no model-facing message.")
     };
+
+    private static string MeterName(ToolArguments arguments) => arguments.RequireStateId("name").Value;
 }

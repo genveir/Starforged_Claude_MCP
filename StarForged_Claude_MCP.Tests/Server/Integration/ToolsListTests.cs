@@ -42,6 +42,10 @@ public class ToolsListTests(TestFixture fixture) : McpServerTestBase(fixture)
             "get_document_summary",
             "list_documents",
             "roll_dice",
+            "get_meters",
+            "update_meter",
+            "create_meter",
+            "remove_meter",
             "request_write_permission",
             "release_write_permission");
     }

@@ -2,7 +2,7 @@ namespace StarForged_Claude_MCP.Server.Tools;
 
 /// <summary>
 /// Argument descriptions that several tools share word for word, so that the model reads one account of
-/// categories, sections and summaries whichever tool it is looking at.
+/// categories, sections, summaries, campaigns and meters whichever tool it is looking at.
 /// </summary>
 public static class ToolDescriptions
 {
@@ -25,6 +25,13 @@ public static class ToolDescriptions
     public const string ReplacementSummary =
         "Optional. Replaces the document's summary, shown alongside the filename whenever the category's documents " +
         "are listed. Leave it out to keep the summary the document already has; pass an empty string to clear it.";
+
+    public const string Campaign =
+        "The name of the active campaign, as given in your instructions. Campaigns cannot be created through these tools.";
+
+    public const string MeterName =
+        "The meter's name: letters, digits and hyphens with at most one dot, e.g. 'health' or 'jorran-hasfer.integrity'. " +
+        "Matched ignoring case; the meter keeps the casing it was created with.";
 
     /// <summary>The section argument of a tool that acts on exactly one section, e.g. "replace" or "delete".</summary>
     public static string Section(string action) =>

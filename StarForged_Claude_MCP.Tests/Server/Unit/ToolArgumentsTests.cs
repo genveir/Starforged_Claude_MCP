@@ -42,4 +42,37 @@ public class ToolArgumentsTests
         arguments.Invoking(a => a.RequireStateId("stateId")).Should().Throw<ArgumentException>()
             .WithMessage("*not well-formed*");
     }
+
+    [Fact]
+    public void OptionalInt_WithoutADefault_WhenAbsent_ShouldReturnNull()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object>());
+
+        arguments.OptionalInt("max").Should().BeNull();
+    }
+
+    [Fact]
+    public void OptionalInt_WithoutADefault_WhenNull_ShouldReturnNull()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["max"] = null! });
+
+        arguments.OptionalInt("max").Should().BeNull();
+    }
+
+    [Fact]
+    public void OptionalInt_WithoutADefault_WhenPresent_ShouldReturnTheValue()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["max"] = 5 });
+
+        arguments.OptionalInt("max").Should().Be(5);
+    }
+
+    [Fact]
+    public void OptionalInt_WithoutADefault_WhenText_ShouldRefuseTheValue()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["max"] = "5" });
+
+        arguments.Invoking(a => a.OptionalInt("max")).Should().Throw<ArgumentException>()
+            .WithMessage("Max has to be a whole number*");
+    }
 }

@@ -95,6 +95,17 @@ public class ToolArguments
         return ReadInt(raw, DisplayName(key));
     }
 
+    /// <summary>
+    /// For a number whose absence means something of its own, such as a range with no upper bound.
+    /// </summary>
+    public int? OptionalInt(string key)
+    {
+        if (IsAbsent(key, out var raw))
+            return null;
+
+        return ReadInt(raw, DisplayName(key));
+    }
+
     public int[] RequireIntArray(string key)
     {
         var raw = RequirePresent(key);

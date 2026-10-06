@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Moq;
 using StarForged_Claude_MCP.Ironsworn.Abstractions;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
@@ -13,7 +14,11 @@ namespace StarForged_Claude_MCP.Tests.Server;
 internal static class McpServerFactory
 {
     public static McpServer Create(
-        IEmbeddingsFacade embeddings, IDocumentsFacade documents, IDiceRoller diceRoller, IWritePermissions writePermissions)
+        IEmbeddingsFacade embeddings,
+        IDocumentsFacade documents,
+        IDiceRoller diceRoller,
+        IWritePermissions writePermissions,
+        IMeterService? meters = null)
     {
         var services = new ServiceCollection();
 
@@ -22,6 +27,7 @@ internal static class McpServerFactory
         services.AddSingleton(documents);
         services.AddSingleton(diceRoller);
         services.AddSingleton(writePermissions);
+        services.AddSingleton(meters ?? new Mock<IMeterService>(MockBehavior.Strict).Object);
         services.AddMcpTools();
         services.AddSingleton<McpServer>();
 
