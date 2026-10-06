@@ -45,7 +45,7 @@ public class ReplaceSectionTextTool : ITool
         var section = arguments.RequireString("section", maxLength: 1_000);
         var oldText = arguments.RequireString("oldText", maxLength: 1_000_000);
         var newText = arguments.RequireStringAllowingEmpty("newText", maxLength: 1_000_000);
-        var summary = arguments.OptionalSummary();
+        var summary = arguments.OptionalStringAllowingEmpty("summary", maxLength: 512);
         _guards.RequireWriteEnabled(category);
 
         _logger.LogDebug("Executing replace_section_text: category={Category}, filename={Filename}, section={Section}, oldTextLength={OldTextLength}, newTextLength={NewTextLength}",

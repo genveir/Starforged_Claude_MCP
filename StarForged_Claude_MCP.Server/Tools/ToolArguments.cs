@@ -64,19 +64,14 @@ public class ToolArguments
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
     }
 
-    /// <summary>
-    /// An absent summary and an empty one mean different things on a write: absent keeps whatever the
-    /// document already carries, empty clears it. Both survive as far as the facade, which is where
-    /// that distinction is resolved against the stored summary.
-    /// </summary>
-    public string? OptionalSummary()
+    public string? OptionalStringAllowingEmpty(string key, int maxLength)
     {
-        var summary = ReadOptional("summary");
+        var value = ReadOptional(key);
 
-        if (summary != null && summary.Length > 512)
-            throw new ArgumentException("Summary exceeds maximum length of 512 characters");
+        if (value != null && value.Length > maxLength)
+            throw new ArgumentException($"{DisplayName(key)} exceeds maximum length of {maxLength:N0} characters");
 
-        return summary?.Trim();
+        return value?.Trim();
     }
 
     public int RequireInt(string key) =>

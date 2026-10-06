@@ -42,7 +42,7 @@ public class UpdateDocumentTool : ITool
         var category = arguments.RequireCategory();
         var filename = arguments.RequireString("filename", maxLength: 500);
         var text = arguments.RequireString("text", maxLength: 1_000_000);
-        var summary = arguments.OptionalSummary();
+        var summary = arguments.OptionalStringAllowingEmpty("summary", maxLength: 512);
         var indexed = arguments.OptionalBool("indexed");
         _guards.RequireWriteEnabled(category);
 

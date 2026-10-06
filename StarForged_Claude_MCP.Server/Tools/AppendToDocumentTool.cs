@@ -43,7 +43,7 @@ public class AppendToDocumentTool : ITool
         var filename = arguments.RequireString("filename", maxLength: 500);
         var section = arguments.OptionalString("section", maxLength: 1_000);
         var text = arguments.RequireString("text", maxLength: 1_000_000);
-        var summary = arguments.OptionalSummary();
+        var summary = arguments.OptionalStringAllowingEmpty("summary", maxLength: 512);
         _guards.RequireWriteEnabled(category);
 
         _logger.LogDebug("Executing append_to_document: category={Category}, filename={Filename}, section={Section}, textLength={TextLength}",
