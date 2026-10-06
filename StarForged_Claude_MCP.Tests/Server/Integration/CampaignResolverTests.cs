@@ -2,7 +2,9 @@ using FluentAssertions;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.Database.Repositories;
 using StarForged_Claude_MCP.Ironsworn.DomainTypes;
+using StarForged_Claude_MCP.Ironsworn.Errors;
 using StarForged_Claude_MCP.Ironsworn.Services;
+using StarForged_Claude_MCP.Shared.Results;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
@@ -28,18 +30,18 @@ public class CampaignResolverTests
 
         var resolved = await _resolver.ResolveCampaignIdByName(new CampaignName("Iron Expanse"));
 
-        resolved.Should().Be(id);
+        resolved.Should().BeOfType<SuccessResult<int, ErrorCode>>().Which.Value.Should().Be(id);
     }
 
     [Fact]
-    public async Task ResolveCampaignIdByName_WhenTheCampaignDoesNotExist_ShouldReturnNull()
+    public async Task ResolveCampaignIdByName_WhenTheCampaignDoesNotExist_ShouldFailWithCampaignNotFound()
     {
         await _fixture.ClearCampaigns();
         await _campaigns.CreateCampaign("Iron Expanse");
 
         var resolved = await _resolver.ResolveCampaignIdByName(new CampaignName("Forge Drift"));
 
-        resolved.Should().BeNull();
+        resolved.Should().BeOfType<FailureResult<int, ErrorCode>>().Which.Error.Should().Be(ErrorCode.Campaign_Not_Found);
     }
 
     [Fact]
@@ -52,7 +54,7 @@ public class CampaignResolverTests
 
         var resolved = await _resolver.ResolveCampaignIdByName(new CampaignName("Forge Drift"));
 
-        resolved.Should().Be(id);
+        resolved.Should().BeOfType<SuccessResult<int, ErrorCode>>().Which.Value.Should().Be(id);
     }
 
     [Fact]
@@ -63,6 +65,6 @@ public class CampaignResolverTests
 
         var resolved = await _resolver.ResolveCampaignIdByName(new CampaignName("IRON EXPANSE"));
 
-        resolved.Should().Be(id);
+        resolved.Should().BeOfType<SuccessResult<int, ErrorCode>>().Which.Value.Should().Be(id);
     }
 }
