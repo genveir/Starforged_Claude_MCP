@@ -1,3 +1,4 @@
+using StarForged_Claude_MCP.Ironsworn.DomainTypes;
 using StarForged_Claude_MCP.Shared.DomainTypes;
 using System.Text.Json;
 
@@ -21,6 +22,20 @@ public class ToolArguments
         var category = RequireString("category", maxLength: 200);
 
         return new Category(category);
+    }
+
+    public CampaignName RequireCampaign()
+    {
+        var campaign = RequireString("campaign", maxLength: 30);
+
+        return new CampaignName(campaign);
+    }
+
+    public StateTrackingId RequireStateId(string key)
+    {
+        var stateId = RequireString(key, maxLength: 100);
+
+        return new StateTrackingId(stateId);
     }
 
     public string RequireString(string key, int maxLength)

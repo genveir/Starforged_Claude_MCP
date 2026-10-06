@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using StarForged_Claude_MCP.ConsoleAccess.Cat;
+using StarForged_Claude_MCP.ConsoleAccess.CreateCampaign;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.List;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
@@ -47,6 +48,7 @@ public class Program
         var printer = host.Services.GetRequiredService<DocumentPrinter>();
         var searcher = host.Services.GetRequiredService<Searcher>();
         var lister = host.Services.GetRequiredService<CategoryLister>();
+        var campaignCreator = host.Services.GetRequiredService<CampaignCreator>();
 
         switch (options)
         {
@@ -65,6 +67,9 @@ public class Program
             case ListOptions listOptions:
                 await lister.List(listOptions);
                 break;
+            case CreateCampaignOptions createCampaignOptions:
+                await campaignCreator.Create(createCampaignOptions);
+                break;
             default: throw new InvalidOperationException("Unsupported options type");
         }
     }
@@ -76,6 +81,7 @@ public class Program
         services.AddSingleton<DocumentPrinter>();
         services.AddSingleton<Searcher>();
         services.AddSingleton<CategoryLister>();
+        services.AddSingleton<CampaignCreator>();
         services.AddSingleton<ISummaryPrompt, ConsoleSummaryPrompt>();
         services.AddSingleton<IIndexPrompt, ConsoleIndexPrompt>();
         services.AddSingleton<IConfirmPrompt, ConsoleConfirmPrompt>();
@@ -98,6 +104,7 @@ public class Program
             "cat" => CatOptions.Parse(args.Skip(1).ToArray()),
             "search" => SearchOptions.Parse(args.Skip(1).ToArray()),
             "list" => ListOptions.Parse(args.Skip(1).ToArray()),
+            "create-campaign" => CreateCampaignOptions.Parse(args.Skip(1).ToArray()),
             _ => HandleInvalidCommand(args[0])
         };
 
@@ -120,6 +127,7 @@ public class Program
         Console.WriteLine("  .\\ConsoleAccess.exe search <category> <searchString> [-t <topK>]");
         Console.WriteLine("  .\\ConsoleAccess.exe list");
         Console.WriteLine("  .\\ConsoleAccess.exe list <category>");
+        Console.WriteLine("  .\\ConsoleAccess.exe create-campaign <name>");
         Console.WriteLine();
     }
 

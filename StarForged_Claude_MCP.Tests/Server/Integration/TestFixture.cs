@@ -2,10 +2,9 @@ using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using StarForged_Claude_MCP.Embeddings;
 using StarForged_Claude_MCP.Database;
-using StarForged_Claude_MCP.Ironsworn.Abstractions;
-using StarForged_Claude_MCP.Ironsworn.Dice;
+using StarForged_Claude_MCP.Embeddings;
+using StarForged_Claude_MCP.Ironsworn;
 using StarForged_Claude_MCP.Server;
 using StarForged_Claude_MCP.Server.Services;
 using StarForged_Claude_MCP.Server.Services.Abstractions;
@@ -13,7 +12,7 @@ using StarForged_Claude_MCP.Server.Tools;
 
 namespace StarForged_Claude_MCP.Tests.Server.Integration;
 
-public class TestFixture : IAsyncLifetime
+public sealed class TestFixture : IAsyncLifetime
 {
     public IServiceProvider Services { get; private set; } = null!;
     private string _connectionString = null!;
@@ -46,13 +45,10 @@ public class TestFixture : IAsyncLifetime
 
         services.AddDatabaseServices();
         services.AddEmbeddingsServices();
+        services.AddIronswornServices();
 
         services.AddSingleton<IEmbeddingsFacade, EmbeddingsFacade>();
         services.AddSingleton<IDocumentsFacade, DocumentsFacade>();
-        services.AddSingleton<IDiceRoller>(_ => new DiceRoller(
-            actionDie: new Die(sides: 6),
-            firstChallengeDie: new Die(sides: 10),
-            secondChallengeDie: new Die(sides: 10)));
         services.AddSingleton<IWritePermissions, WritePermissions>();
         services.AddMcpTools();
         services.AddSingleton<McpServer>();
@@ -74,6 +70,14 @@ public class TestFixture : IAsyncLifetime
         }
 
         await DropDatabase();
+    }
+
+    public async Task ClearCampaigns()
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+
+        await connection.ExecuteAsync("delete from Campaigns");
     }
 
     private static async Task CreateDatabase(string masterConnectionString, string databaseName)
@@ -104,7 +108,6 @@ public class TestFixture : IAsyncLifetime
 
     private async Task DropDatabase()
     {
-        var builder = new SqlConnectionStringBuilder(_connectionString);
         var masterConnectionString = new SqlConnectionStringBuilder(_connectionString)
         {
             InitialCatalog = "master"

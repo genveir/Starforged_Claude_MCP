@@ -3,6 +3,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using StarForged_Claude_MCP.ConsoleAccess;
 using StarForged_Claude_MCP.ConsoleAccess.Cat;
+using StarForged_Claude_MCP.ConsoleAccess.CreateCampaign;
 using StarForged_Claude_MCP.ConsoleAccess.Download;
 using StarForged_Claude_MCP.ConsoleAccess.Search;
 using StarForged_Claude_MCP.ConsoleAccess.Upload;
@@ -16,6 +17,7 @@ public class ServiceRegistrationTests
     [InlineData(typeof(FileDownloader))]
     [InlineData(typeof(DocumentPrinter))]
     [InlineData(typeof(Searcher))]
+    [InlineData(typeof(CampaignCreator))]
     [InlineData(typeof(ISummaryPrompt))]
     [InlineData(typeof(IIndexPrompt))]
     [InlineData(typeof(IConfirmPrompt))]

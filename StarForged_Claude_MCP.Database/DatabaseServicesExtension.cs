@@ -8,8 +8,10 @@ public static class DatabaseServicesExtension
     public static IServiceCollection AddDatabaseServices(this IServiceCollection services)
     {
         services.AddSingleton<DbConnectionFactory>();
+
         services.AddSingleton<DocumentsRepository>();
         services.AddSingleton<EmbeddingsRepository>();
+        services.AddSingleton<CampaignRepository>();
 
         return services;
     }
