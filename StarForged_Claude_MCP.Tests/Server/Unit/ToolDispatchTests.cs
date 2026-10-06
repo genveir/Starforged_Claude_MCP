@@ -20,7 +20,7 @@ public class ToolDispatchTests
 {
     private sealed record ToolCase(
         Dictionary<string, object> Arguments,
-        Action<Mock<IEmbeddingsFacade>, Mock<IDocumentsFacade>, Mock<IWritePermissions>, Mock<IMeterService>> VerifyDispatch);
+        Action<Mock<IEmbeddingsFacade>, Mock<IDocumentsFacade>, Mock<IWritePermissions>, Mock<IMeterService>, Mock<ITrackService>> VerifyDispatch);
 
     private const string Category = "lore";
     private const string Filename = "derelict.md";
@@ -29,6 +29,8 @@ public class ToolDispatchTests
     private const string Section = "Derelicts";
     private const string Campaign = "Iron Expanse";
     private const string MeterName = "health";
+    private const string TrackArgument = "vow.handle-the-plantation";
+    private const string TrackDescription = "Handle the drug plantation.";
 
     /// <summary>
     /// One representative call per advertised tool. Every advertised tool must appear here —
@@ -42,7 +44,7 @@ public class ToolDispatchTests
                 ["query"] = "derelict in the Forge",
                 ["category"] = Category
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 embeddings.Verify(f => f.SearchAsync("derelict in the Forge", new(Category), 3), Times.Once)),
 
         ["find_text"] = new ToolCase(
@@ -53,12 +55,12 @@ public class ToolDispatchTests
                 ["wholeWord"] = true,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.FindTextAsync(new(Category), "Bluejay", true, Filename), Times.Once)),
 
         ["retrieve_search_results"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["ids"] = new object[] { 7, 11 } },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 embeddings.Verify(f => f.RetrieveByIdsAsync(It.Is<int[]>(ids => ids.SequenceEqual(new[] { 7, 11 }))), Times.Once)),
 
         ["add_document"] = new ToolCase(
@@ -70,7 +72,7 @@ public class ToolDispatchTests
                 ["summary"] = Summary,
                 ["indexed"] = true
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.AddDocumentAsync(new(Category), Filename, Text, Summary, true), Times.Once)),
 
         ["update_document"] = new ToolCase(
@@ -82,7 +84,7 @@ public class ToolDispatchTests
                 ["summary"] = Summary,
                 ["indexed"] = false
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.UpdateDocumentAsync(new(Category), Filename, Text, Summary, false), Times.Once)),
 
         ["replace_document_section"] = new ToolCase(
@@ -94,7 +96,7 @@ public class ToolDispatchTests
                 ["text"] = Text,
                 ["summary"] = Summary
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.ReplaceSectionAsync(new(Category), Filename, Section, Text, Summary), Times.Once)),
 
         ["replace_section_text"] = new ToolCase(
@@ -107,7 +109,7 @@ public class ToolDispatchTests
                 ["newText"] = "hangs derelict",
                 ["summary"] = Summary
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.ReplaceSectionTextAsync(new(Category), Filename, Section, "drifts", "hangs derelict", Summary), Times.Once)),
 
         ["append_to_document"] = new ToolCase(
@@ -118,7 +120,7 @@ public class ToolDispatchTests
                 ["section"] = Section,
                 ["text"] = Text
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.AppendAsync(new(Category), Filename, Section, Text, null), Times.Once)),
 
         ["delete_document_section"] = new ToolCase(
@@ -128,7 +130,7 @@ public class ToolDispatchTests
                 ["filename"] = Filename,
                 ["section"] = Section
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.DeleteSectionAsync(new(Category), Filename, Section, null), Times.Once)),
 
         ["archive_document"] = new ToolCase(
@@ -137,7 +139,7 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.DeleteDocumentAsync(new(Category), Filename), Times.Once)),
 
         ["get_document"] = new ToolCase(
@@ -146,7 +148,7 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.GetDocumentAsync(new(Category), Filename), Times.Once)),
 
         ["get_document_summary"] = new ToolCase(
@@ -155,17 +157,17 @@ public class ToolDispatchTests
                 ["category"] = Category,
                 ["filename"] = Filename
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.GetDocumentSummaryAsync(new(Category), Filename), Times.Once)),
 
         ["list_documents"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 documents.Verify(f => f.GetDocumentIndexAsync(new(Category)), Times.Once)),
 
         ["roll_dice"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["purpose"] = "Face Danger: a hit means I cross the gap" },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
             {
                 embeddings.VerifyNoOtherCalls();
                 documents.VerifyNoOtherCalls();
@@ -173,7 +175,7 @@ public class ToolDispatchTests
 
         ["get_meters"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["campaign"] = Campaign, ["name"] = MeterName },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 meters.Verify(m => m.GetMeter(IsCampaign(), IsMeterName()), Times.Once)),
 
         ["update_meter"] = new ToolCase(
@@ -184,7 +186,7 @@ public class ToolDispatchTests
                 ["mode"] = "delta",
                 ["value"] = -2
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 meters.Verify(m => m.AdjustMeter(IsCampaign(), IsMeterName(), -2), Times.Once)),
 
         ["create_meter"] = new ToolCase(
@@ -196,22 +198,65 @@ public class ToolDispatchTests
                 ["max"] = 5,
                 ["value"] = 5
             },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 meters.Verify(m => m.CreateMeter(IsCampaign(), IsMeterName(), 0, 5, 5), Times.Once)),
 
         ["remove_meter"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["campaign"] = Campaign, ["name"] = MeterName },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 meters.Verify(m => m.RemoveMeter(IsCampaign(), IsMeterName()), Times.Once)),
+
+        ["get_tracks"] = new ToolCase(
+            Arguments: new Dictionary<string, object> { ["campaign"] = Campaign, ["track"] = TrackArgument },
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
+                tracks.Verify(t => t.GetTrack(IsCampaign(), IsTrackId()), Times.Once)),
+
+        ["update_track"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["campaign"] = Campaign,
+                ["track"] = TrackArgument,
+                ["mode"] = "mark",
+                ["value"] = 2
+            },
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
+                tracks.Verify(t => t.MarkTrack(IsCampaign(), IsTrackId(), 2), Times.Once)),
+
+        ["create_track"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["campaign"] = Campaign,
+                ["track"] = TrackArgument,
+                ["description"] = TrackDescription,
+                ["rank"] = "dangerous",
+                ["ticks"] = 4
+            },
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
+                tracks.Verify(t => t.CreateTrack(IsCampaign(), IsTrackId(), TrackDescription, Rank.Dangerous, 4), Times.Once)),
+
+        ["edit_track"] = new ToolCase(
+            Arguments: new Dictionary<string, object>
+            {
+                ["campaign"] = Campaign,
+                ["track"] = TrackArgument,
+                ["rank"] = "epic"
+            },
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
+                tracks.Verify(t => t.EditTrack(IsCampaign(), IsTrackId(), description: null, Rank.Epic), Times.Once)),
+
+        ["remove_track"] = new ToolCase(
+            Arguments: new Dictionary<string, object> { ["campaign"] = Campaign, ["track"] = TrackArgument },
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
+                tracks.Verify(t => t.RemoveTrack(IsCampaign(), IsTrackId()), Times.Once)),
 
         ["request_write_permission"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 permissions.Verify(p => p.EnableWrite(new(Category)), Times.Once)),
 
         ["release_write_permission"] = new ToolCase(
             Arguments: new Dictionary<string, object> { ["category"] = Category },
-            VerifyDispatch: (embeddings, documents, permissions, meters) =>
+            VerifyDispatch: (embeddings, documents, permissions, meters, tracks) =>
                 permissions.Verify(p => p.DisableWrite(new(Category)), Times.Once))
     };
 
@@ -246,8 +291,9 @@ public class ToolDispatchTests
         var documents = CreateDocumentsMock();
         var permissions = CreateWritePermissionsMock();
         var meters = CreateMetersMock();
+        var tracks = CreateTracksMock();
         var server = McpServerFactory.Create(
-            embeddings.Object, documents.Object, CreateDiceRoller(), permissions.Object, meters.Object);
+            embeddings.Object, documents.Object, CreateDiceRoller(), permissions.Object, meters.Object, tracks.Object);
 
         var response = await McpServerInvoker.HandleRequestAsync(server, new JsonRpcRequest
         {
@@ -264,7 +310,7 @@ public class ToolDispatchTests
             because: "'{0}' is advertised by tools/list, so calling it by that name must resolve to a handler",
             toolName);
 
-        toolCase.VerifyDispatch(embeddings, documents, permissions, meters);
+        toolCase.VerifyDispatch(embeddings, documents, permissions, meters, tracks);
     }
 
     [Fact]
@@ -335,6 +381,28 @@ public class ToolDispatchTests
             .ReturnsAsync(change);
         mock.Setup(m => m.RemoveMeter(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>()))
             .ReturnsAsync(Result<StateTrackingId, ErrorCode>.Succeed(meter.Name));
+
+        return mock;
+    }
+
+    private static StateTrackingId IsTrackId() => It.Is<StateTrackingId>(track => track.Value == TrackArgument);
+
+    private static Mock<ITrackService> CreateTracksMock()
+    {
+        var mock = new Mock<ITrackService>(MockBehavior.Strict);
+        var track = new Track(new(TrackKind.Vow, "handle-the-plantation"), TrackDescription, Rank.Dangerous, ticks: 8);
+        var change = Result<TrackChange, ErrorCode>.Succeed(new TrackChange(track, Clamped: 0));
+
+        mock.Setup(t => t.GetTrack(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>()))
+            .ReturnsAsync(Result<Track, ErrorCode>.Succeed(track));
+        mock.Setup(t => t.MarkTrack(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>(), It.IsAny<int>()))
+            .ReturnsAsync(change);
+        mock.Setup(t => t.CreateTrack(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>(), It.IsAny<string>(), It.IsAny<Rank>(), It.IsAny<int>()))
+            .ReturnsAsync(change);
+        mock.Setup(t => t.EditTrack(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>(), It.IsAny<string?>(), It.IsAny<Rank?>()))
+            .ReturnsAsync(Result<Track, ErrorCode>.Succeed(track));
+        mock.Setup(t => t.RemoveTrack(It.IsAny<CampaignName>(), It.IsAny<StateTrackingId>()))
+            .ReturnsAsync(Result<TrackId, ErrorCode>.Succeed(track.Id));
 
         return mock;
     }

@@ -30,6 +30,11 @@ public static class ToolServicesExtension
         services.AddSingleton<ITool, UpdateMeterTool>();
         services.AddSingleton<ITool, CreateMeterTool>();
         services.AddSingleton<ITool, RemoveMeterTool>();
+        services.AddSingleton<ITool, GetTracksTool>();
+        services.AddSingleton<ITool, UpdateTrackTool>();
+        services.AddSingleton<ITool, CreateTrackTool>();
+        services.AddSingleton<ITool, EditTrackTool>();
+        services.AddSingleton<ITool, RemoveTrackTool>();
         services.AddSingleton<ITool, RequestWritePermissionTool>();
         services.AddSingleton<ITool, ReleaseWritePermissionTool>();
 

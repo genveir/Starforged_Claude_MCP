@@ -18,7 +18,8 @@ internal static class McpServerFactory
         IDocumentsFacade documents,
         IDiceRoller diceRoller,
         IWritePermissions writePermissions,
-        IMeterService? meters = null)
+        IMeterService? meters = null,
+        ITrackService? tracks = null)
     {
         var services = new ServiceCollection();
 
@@ -28,6 +29,7 @@ internal static class McpServerFactory
         services.AddSingleton(diceRoller);
         services.AddSingleton(writePermissions);
         services.AddSingleton(meters ?? new Mock<IMeterService>(MockBehavior.Strict).Object);
+        services.AddSingleton(tracks ?? new Mock<ITrackService>(MockBehavior.Strict).Object);
         services.AddMcpTools();
         services.AddSingleton<McpServer>();
 

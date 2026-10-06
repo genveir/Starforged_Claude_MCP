@@ -1,4 +1,5 @@
 using FluentAssertions;
+using StarForged_Claude_MCP.Ironsworn.DomainTypes;
 using StarForged_Claude_MCP.Server.Tools;
 
 namespace StarForged_Claude_MCP.Tests.Server.Unit;
@@ -74,5 +75,51 @@ public class ToolArgumentsTests
 
         arguments.Invoking(a => a.OptionalInt("max")).Should().Throw<ArgumentException>()
             .WithMessage("Max has to be a whole number*");
+    }
+
+    [Theory]
+    [InlineData("dangerous")]
+    [InlineData("Dangerous")]
+    [InlineData("DANGEROUS")]
+    public void RequireChoice_WithANameInAnyCasing_ShouldReturnTheValue(string rank)
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["rank"] = rank });
+
+        arguments.RequireChoice<Rank>("rank").Should().Be(Rank.Dangerous);
+    }
+
+    [Theory]
+    [InlineData("deadly")]
+    [InlineData("1")]
+    public void RequireChoice_WithAnythingElse_ShouldRefuseItNamingTheAcceptedValues(string rank)
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["rank"] = rank });
+
+        arguments.Invoking(a => a.RequireChoice<Rank>("rank")).Should().Throw<ArgumentException>()
+            .WithMessage(
+                "Rank has to be \"troublesome\", \"dangerous\", \"formidable\", \"extreme\" or \"epic\", " +
+                $"but \"{rank}\" was sent.");
+    }
+
+    [Fact]
+    public void OptionalChoice_WhenAbsent_ShouldReturnNull()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object>());
+
+        arguments.OptionalChoice<Rank>("rank").Should().BeNull();
+    }
+
+    [Fact]
+    public void OptionalChoice_WhenPresent_ShouldReturnTheValue()
+    {
+        var arguments = new ToolArguments(new Dictionary<string, object> { ["kind"] = "Expedition" });
+
+        arguments.OptionalChoice<TrackKind>("kind").Should().Be(TrackKind.Expedition);
+    }
+
+    [Fact]
+    public void Choices_ShouldListTheNamesInLowercase()
+    {
+        ToolArguments.Choices<TrackKind>().Should().Equal("vow", "connection", "expedition", "combat");
     }
 }

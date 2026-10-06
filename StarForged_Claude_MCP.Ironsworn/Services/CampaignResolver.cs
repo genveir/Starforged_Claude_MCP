@@ -22,4 +22,15 @@ internal class CampaignResolver
             ? Result<int, ErrorCode>.Succeed(id)
             : Result<int, ErrorCode>.Fail(ErrorCode.Campaign_Not_Found);
     }
+
+    /// <summary>Resolves the campaign and runs the operation on its id, or fails with Campaign_Not_Found.</summary>
+    public async Task<Result<T, ErrorCode>> InCampaign<T>(
+        CampaignName campaign, Func<int, Task<Result<T, ErrorCode>>> operation)
+    {
+        var campaignId = await ResolveCampaignIdByName(campaign);
+
+        return await campaignId.Map(
+            onSuccess: operation,
+            onFailure: Result<T, ErrorCode>.FailAsTask);
+    }
 }

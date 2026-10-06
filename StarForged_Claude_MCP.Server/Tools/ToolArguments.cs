@@ -38,6 +38,9 @@ public class ToolArguments
         return new StateTrackingId(stateId);
     }
 
+    public StateTrackingId? OptionalStateId(string key) =>
+        OptionalString(key, maxLength: 100) is { } stateId ? new StateTrackingId(stateId) : null;
+
     public string RequireString(string key, int maxLength)
     {
         var value = _arguments.TryGetValue(key, out var raw) ? raw?.ToString() : null;
@@ -83,6 +86,20 @@ public class ToolArguments
 
         return value?.Trim();
     }
+
+    /// <summary>
+    /// One of an enum's values, sent as its name in any casing. A schema advertises the names as
+    /// <see cref="Choices{TEnum}"/> lists them, and anything else is refused naming each of them.
+    /// </summary>
+    public TEnum RequireChoice<TEnum>(string key) where TEnum : struct, Enum =>
+        ReadChoice<TEnum>(key, RequireString(key, maxLength: 100));
+
+    public TEnum? OptionalChoice<TEnum>(string key) where TEnum : struct, Enum =>
+        OptionalString(key, maxLength: 100) is { } text ? ReadChoice<TEnum>(key, text) : null;
+
+    /// <summary>The names of an enum's values in lowercase, for a schema's enum.</summary>
+    public static string[] Choices<TEnum>() where TEnum : struct, Enum =>
+        [.. Enum.GetNames<TEnum>().Select(name => name.ToLowerInvariant())];
 
     public int RequireInt(string key) =>
         ReadInt(RequirePresent(key), DisplayName(key));
@@ -184,6 +201,19 @@ public class ToolArguments
             throw WrongType(name, $"the text \"{text}\"", expected);
 
         return Convert.ToInt32(raw);
+    }
+
+    // Checked by name first: Enum.Parse alone would also take a number such as "1" for a value.
+    private static TEnum ReadChoice<TEnum>(string key, string text) where TEnum : struct, Enum
+    {
+        if (!Enum.GetNames<TEnum>().Contains(text, StringComparer.OrdinalIgnoreCase))
+        {
+            var choices = Choices<TEnum>().Select(choice => $"\"{choice}\"").ToArray();
+            throw new ArgumentException(
+                $"{DisplayName(key)} has to be {string.Join(", ", choices[..^1])} or {choices[^1]}, but \"{text}\" was sent.");
+        }
+
+        return Enum.Parse<TEnum>(text, ignoreCase: true);
     }
 
     private object RequirePresent(string key)

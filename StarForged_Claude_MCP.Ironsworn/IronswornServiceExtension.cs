@@ -16,6 +16,7 @@ public static class IronswornServiceExtension
 
         services.AddSingleton<CampaignResolver>();
         services.AddSingleton<IMeterService, MeterService>();
+        services.AddSingleton<ITrackService, TrackService>();
 
         return services;
     }

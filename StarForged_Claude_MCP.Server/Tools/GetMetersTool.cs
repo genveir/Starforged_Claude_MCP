@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using StarForged_Claude_MCP.Ironsworn.Abstractions;
-using StarForged_Claude_MCP.Ironsworn.DomainTypes;
 using StarForged_Claude_MCP.Server.Models;
 using StarForged_Claude_MCP.Server.Tools.Abstractions;
 
@@ -36,7 +35,7 @@ public class GetMetersTool : ITool
     public async Task<string> ExecuteAsync(ToolArguments arguments)
     {
         var campaign = arguments.RequireCampaign();
-        var name = arguments.OptionalString("name", maxLength: 100) is { } text ? new StateTrackingId(text) : null;
+        var name = arguments.OptionalStateId("name");
 
         _logger.LogDebug("Executing get_meters: campaign={Campaign}, name={Name}", campaign.Value, name?.Value);
 

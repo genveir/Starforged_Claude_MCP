@@ -22,8 +22,24 @@ public static class StateToolErrors
         ErrorCode.Meter_Range_Invalid => new ArgumentException(
             $"Max {arguments.OptionalInt("max")} is below min {arguments.RequireInt("min")}; a meter's max cannot be " +
             "lower than its min."),
+        ErrorCode.Track_Id_Needs_Kind => new ArgumentException(
+            $"Track '{TrackId(arguments)}' has no kind: a track id has to start with its kind and a dot, e.g. " +
+            $"'vow.handle-the-plantation'. {TrackKinds}"),
+        ErrorCode.Track_Kind_Unknown => new ArgumentException(
+            $"'{TrackId(arguments).Split('.')[0]}' is not a track kind. {TrackKinds}"),
+        ErrorCode.Track_Not_Found => new ArgumentException(
+            $"No track '{TrackId(arguments)}' exists in campaign '{arguments.RequireCampaign().Value}'. " +
+            "get_tracks lists the campaign's tracks."),
+        ErrorCode.Track_Already_Exists => new ArgumentException(
+            $"A track '{TrackId(arguments)}' already exists in campaign '{arguments.RequireCampaign().Value}'. " +
+            "Use edit_track to change its description or rank, update_track to change its progress, or remove_track " +
+            "to remove it first."),
         _ => throw new InvalidOperationException($"Error code {code} has no model-facing message.")
     };
 
+    private const string TrackKinds = "Track kinds are vow, connection, expedition and combat.";
+
     private static string MeterName(ToolArguments arguments) => arguments.RequireStateId("name").Value;
+
+    private static string TrackId(ToolArguments arguments) => arguments.RequireStateId("track").Value;
 }

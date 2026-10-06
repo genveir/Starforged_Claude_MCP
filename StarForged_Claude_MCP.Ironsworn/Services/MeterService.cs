@@ -19,7 +19,7 @@ internal class MeterService : IMeterService
     }
 
     public Task<Result<IReadOnlyList<Meter>, ErrorCode>> GetMeters(CampaignName campaign) =>
-        InCampaign(campaign, operation: async campaignId =>
+        _campaignResolver.InCampaign(campaign, operation: async campaignId =>
         {
             var rows = await _meterRepository.GetMeters(campaignId);
 
@@ -27,7 +27,7 @@ internal class MeterService : IMeterService
         });
 
     public Task<Result<Meter, ErrorCode>> GetMeter(CampaignName campaign, StateTrackingId name) =>
-        InCampaign(campaign, operation: async campaignId =>
+        _campaignResolver.InCampaign(campaign, operation: async campaignId =>
         {
             var row = await _meterRepository.GetMeter(campaignId, name.Value);
 
@@ -38,7 +38,7 @@ internal class MeterService : IMeterService
 
     public Task<Result<MeterChange, ErrorCode>> CreateMeter(
         CampaignName campaign, StateTrackingId name, int min, int? max, int value) =>
-        InCampaign(campaign, operation: campaignId => Meter.Create(name, min, max, value).Map(
+        _campaignResolver.InCampaign(campaign, operation: campaignId => Meter.Create(name, min, max, value).Map(
             onSuccess: async created =>
             {
                 if (await _meterRepository.GetMeter(campaignId, name.Value) is not null)
@@ -58,7 +58,7 @@ internal class MeterService : IMeterService
         ChangeMeter(campaign, name, change: meter => meter.SetTo(value));
 
     public Task<Result<StateTrackingId, ErrorCode>> RemoveMeter(CampaignName campaign, StateTrackingId name) =>
-        InCampaign(campaign, operation: async campaignId =>
+        _campaignResolver.InCampaign(campaign, operation: async campaignId =>
         {
             var removed = await _meterRepository.DeleteMeter(campaignId, name.Value);
 
@@ -69,7 +69,7 @@ internal class MeterService : IMeterService
 
     private Task<Result<MeterChange, ErrorCode>> ChangeMeter(
         CampaignName campaign, StateTrackingId name, Func<Meter, MeterChange> change) =>
-        InCampaign(campaign, operation: async campaignId =>
+        _campaignResolver.InCampaign(campaign, operation: async campaignId =>
         {
             var row = await _meterRepository.GetMeter(campaignId, name.Value);
             if (row is null)
@@ -80,16 +80,6 @@ internal class MeterService : IMeterService
 
             return Result<MeterChange, ErrorCode>.Succeed(changed);
         });
-
-    private async Task<Result<T, ErrorCode>> InCampaign<T>(
-        CampaignName campaign, Func<int, Task<Result<T, ErrorCode>>> operation)
-    {
-        var campaignId = await _campaignResolver.ResolveCampaignIdByName(campaign);
-
-        return await campaignId.Map(
-            onSuccess: operation,
-            onFailure: Result<T, ErrorCode>.FailAsTask);
-    }
 
     private static Meter ToMeter(MeterRow row) =>
         new(new StateTrackingId(row.Name), row.Value, row.MinValue, row.MaxValue);

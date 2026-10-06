@@ -13,6 +13,7 @@ public static class DatabaseServicesExtension
         services.AddSingleton<EmbeddingsRepository>();
         services.AddSingleton<CampaignRepository>();
         services.AddSingleton<MeterRepository>();
+        services.AddSingleton<TrackRepository>();
 
         return services;
     }

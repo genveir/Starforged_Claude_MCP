@@ -2,7 +2,7 @@ namespace StarForged_Claude_MCP.Server.Tools;
 
 /// <summary>
 /// Argument descriptions that several tools share word for word, so that the model reads one account of
-/// categories, sections, summaries, campaigns and meters whichever tool it is looking at.
+/// categories, sections, summaries, campaigns, meters and tracks whichever tool it is looking at.
 /// </summary>
 public static class ToolDescriptions
 {
@@ -32,6 +32,11 @@ public static class ToolDescriptions
     public const string MeterName =
         "The meter's name: letters, digits and hyphens with at most one dot, e.g. 'health' or 'jorran-hasfer.integrity'. " +
         "Matched ignoring case; the meter keeps the casing it was created with.";
+
+    public const string Track =
+        "The track's id: its kind and a name joined by a dot, e.g. 'vow.handle-the-plantation'. Kinds are vow, " +
+        "connection, expedition and combat; the name is letters, digits and hyphens. Matched ignoring case; the track " +
+        "keeps the casing it was created with.";
 
     /// <summary>The section argument of a tool that acts on exactly one section, e.g. "replace" or "delete".</summary>
     public static string Section(string action) =>

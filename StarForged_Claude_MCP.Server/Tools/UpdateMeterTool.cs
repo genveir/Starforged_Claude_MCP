@@ -30,7 +30,7 @@ public class UpdateMeterTool : ITool
                 mode = new
                 {
                     type = "string",
-                    @enum = new[] { "delta", "set" },
+                    @enum = ToolArguments.Choices<Mode>(),
                     description = "\"delta\" to change the value by an amount, \"set\" to replace it."
                 },
                 value = new { type = "integer", description = "For delta, the amount to change the value by, negative to lower it; for set, the new value." }
@@ -43,7 +43,7 @@ public class UpdateMeterTool : ITool
     {
         var campaign = arguments.RequireCampaign();
         var name = arguments.RequireStateId("name");
-        var mode = arguments.RequireString("mode", maxLength: 100);
+        var mode = arguments.RequireChoice<Mode>("mode");
         var value = arguments.RequireInt("value");
 
         _logger.LogDebug(
@@ -52,13 +52,15 @@ public class UpdateMeterTool : ITool
 
         var change = mode switch
         {
-            "delta" => await _meters.AdjustMeter(campaign, name, value),
-            "set" => await _meters.SetMeter(campaign, name, value),
-            _ => throw new ArgumentException($"Mode has to be \"delta\" or \"set\", but \"{mode}\" was sent.")
+            Mode.Delta => await _meters.AdjustMeter(campaign, name, value),
+            Mode.Set => await _meters.SetMeter(campaign, name, value),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, message: null)
         };
 
         return change.Map(
             onSuccess: changed => McpJson.Serialize(MeterRecord.From(changed)),
             onFailure: code => throw StateToolErrors.ToArgumentException(code, arguments));
     }
+
+    private enum Mode { Delta, Set }
 }
